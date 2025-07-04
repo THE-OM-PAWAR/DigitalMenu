@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Store, Settings, User, LogOut, Building } from 'lucide-react';
+import { Store, Settings, User, LogOut, Building, Settings2Icon, Settings2, SettingsIcon, Menu } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 
@@ -66,10 +66,10 @@ export default function DashboardHeader({ outlet, onSignOut }: DashboardHeaderPr
           <div className="flex items-center space-x-4">
             {/* Outlet Settings */}
             {outlet && (
-              <Link href="/dashboard/outlet-settings">
+              <Link href="#">
                 <Button variant="ghost" size="sm" className="text-gray-700 hover:text-blue-600">
-                  <Building className="h-4 w-4 mr-2" />
-                  Outlet Settings
+                  <Menu className="h-5 w-5 mr-2" />
+                  Manage Menu
                 </Button>
               </Link>
             )}
@@ -99,9 +99,9 @@ export default function DashboardHeader({ outlet, onSignOut }: DashboardHeaderPr
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/settings" className="cursor-pointer">
+                  <Link href="/dashboard/outlet-settings" className="cursor-pointer">
                     <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
+                    <span>Outlet Settings</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
