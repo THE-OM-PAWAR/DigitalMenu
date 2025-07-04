@@ -4,7 +4,7 @@ export interface IUser extends Document {
   username: string;
   email: string;
   password: string;
-  outletIds: string[];
+  outletId?: mongoose.Types.ObjectId;
   createdAt: Date;
 }
 
@@ -28,10 +28,10 @@ const UserSchema = new Schema<IUser>({
     required: true,
     minlength: 6,
   },
-  outletIds: [{
+  outletId: {
     type: Schema.Types.ObjectId,
     ref: 'Outlet',
-  }],
+  },
   createdAt: {
     type: Date,
     default: Date.now,

@@ -14,12 +14,12 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
 
-    const userDoc = await User.findById(user.userId).populate('outletIds');
+    const userDoc = await User.findById(user.userId).populate('outletId');
     if (!userDoc) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ outlets: userDoc.outletIds });
+    return NextResponse.json({ outlet: userDoc.outletId });
   } catch (error) {
     console.error('Get outlets error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -48,6 +48,15 @@ export async function POST(request: NextRequest) {
 
     await connectDB();
 
+    // Check if user already has an outlet
+    const existingUser = await User.findById(user.userId);
+    if (existingUser?.outletId) {
+      return NextResponse.json(
+        { error: 'User already has an outlet' },
+        { status: 409 }
+      );
+    }
+
     // Create outlet
     const outlet = await Outlet.create({
       name,
@@ -55,10 +64,10 @@ export async function POST(request: NextRequest) {
       adminUserId: user.userId,
     });
 
-    // Add outlet to user's outletIds
+    // Add outlet to user's outletId
     await User.findByIdAndUpdate(
       user.userId,
-      { $push: { outletIds: outlet._id } }
+      { outletId: outlet._id }
     );
 
     return NextResponse.json(

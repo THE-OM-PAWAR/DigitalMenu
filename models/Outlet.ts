@@ -2,6 +2,10 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IOutlet extends Document {
   name: string;
+  logo?: string;
+  description?: string;
+  address?: string;
+  phone?: string;
   createdBy: mongoose.Types.ObjectId;
   adminUserId: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -14,6 +18,25 @@ const OutletSchema = new Schema<IOutlet>({
     trim: true,
     minlength: 2,
     maxlength: 100,
+  },
+  logo: {
+    type: String,
+    default: '',
+  },
+  description: {
+    type: String,
+    default: '',
+    maxlength: 500,
+  },
+  address: {
+    type: String,
+    default: '',
+    maxlength: 200,
+  },
+  phone: {
+    type: String,
+    default: '',
+    maxlength: 20,
   },
   createdBy: {
     type: Schema.Types.ObjectId,
