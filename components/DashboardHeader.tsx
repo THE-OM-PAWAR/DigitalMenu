@@ -66,12 +66,23 @@ export default function DashboardHeader({ outlet, onSignOut }: DashboardHeaderPr
           <div className="flex items-center space-x-4">
             {/* Outlet Settings */}
             {outlet && (
+              <>
               <Link href="/dashboard/menu">
                 <Button variant="ghost" size="sm" className="text-gray-700 hover:text-blue-600">
                   <Menu className="h-5 w-5 mr-2" />
                   Manage Menu
                 </Button>
               </Link>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-gray-700 hover:text-orange-600"
+                onClick={() => window.open(`/menu/${outlet._id}`, '_blank')}
+              >
+                <Store className="h-5 w-5 mr-2" />
+                View Menu
+              </Button>
+              </>
             )}
 
             {/* User Profile Dropdown */}

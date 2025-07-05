@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Store, Plus, Menu, Users, QrCode, TrendingUp, Loader2 } from 'lucide-react';
+import { Store, Plus, Menu, Users, QrCode, TrendingUp, Loader2, Link } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardHeader from '@/components/DashboardHeader';
 import axios from 'axios';
@@ -178,6 +178,7 @@ export default function DashboardPage() {
             {/* Quick Actions */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card className="hover:shadow-lg transition-shadow duration-300 cursor-pointer">
+                <Link href="/dashboard/menu">
                 <CardHeader>
                   <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-lg flex items-center justify-center mb-4">
                     <Menu className="h-6 w-6 text-white" />
@@ -192,6 +193,7 @@ export default function DashboardPage() {
                     Get Started
                   </Button>
                 </CardContent>
+                </Link>
               </Card>
 
               <Card className="hover:shadow-lg transition-shadow duration-300 cursor-pointer">
@@ -227,6 +229,25 @@ export default function DashboardPage() {
                   </Button>
                 </CardContent>
               </Card>
+
+              {outlet && (
+                <Card className="hover:shadow-lg transition-shadow duration-300 cursor-pointer">
+                  <CardHeader>
+                    <div className="w-12 h-12 bg-gradient-to-r from-orange-600 to-red-600 rounded-lg flex items-center justify-center mb-4">
+                      <Store className="h-6 w-6 text-white" />
+                    </div>
+                    <CardTitle>View Public Menu</CardTitle>
+                    <CardDescription>
+                      See how your menu looks to customers
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button variant="outline" className="w-full" onClick={() => window.open(`/menu/${outlet._id}`, '_blank')}>
+                      Open Menu
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </>
         )}
