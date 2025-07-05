@@ -8,9 +8,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Utensils, ArrowLeft, Loader2, Save, Image, DollarSign, Tag } from 'lucide-react';
+import { 
+  Utensils, ArrowLeft, Loader2, Save, Search, Plus, Upload, X, MoreHorizontal, 
+  Edit, Trash2, AlertTriangle, DollarSign, Leaf, Beef
+} from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardHeader from '@/components/DashboardHeader';
 import axios from 'axios';
@@ -22,48 +41,80 @@ interface Outlet {
   logo?: string;
 }
 
+interface Category {
+  _id: string;
+  name: string;
+}
+
+interface Quantity {
+  _id: string;
+  value: string;
+  description: string;
+}
+
+interface QuantityPrice {
+  quantityId: string;
+  price: number;
+}
+
+interface Item {
+  _id: string;
+  name: string;
+  description: string;
+  image?: string;
+  categoryId: {
+    _id: string;
+    name: string;
+  };
+  isVeg: boolean;
+  quantityPrices: {
+    quantityId: {
+      _id: string;
+      value: string;
+      description: string;
+    };
+    price: number;
+  }[];
+  createdAt: string;
+}
+
 export default function CreateItemPage() {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const [outlet, setOutlet] = useState<Outlet | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [quantities, setQuantities] = useState<Quantity[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    price: '',
-    category: '',
-    quantitySet: '',
     image: '',
-    ingredients: '',
-    allergens: [] as string[],
-    dietaryInfo: [] as string[],
-    isAvailable: true,
-    preparationTime: '',
-    calories: '',
+    categoryId: '',
+    isVeg: true,
+    quantityPrices: [] as QuantityPrice[],
   });
+  
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    description: '',
+    image: '',
+    categoryId: '',
+    isVeg: true,
+    quantityPrices: [] as QuantityPrice[],
+  });
+  
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Mock data - in real app, these would come from API
-  const categories = [
-    { id: '1', name: 'Appetizers' },
-    { id: '2', name: 'Main Courses' },
-    { id: '3', name: 'Desserts' },
-    { id: '4', name: 'Beverages' },
-  ];
-
-  const quantitySets = [
-    { id: '1', name: 'Portion Sizes' },
-    { id: '2', name: 'Drink Sizes' },
-  ];
-
-  const allergenOptions = [
-    'Gluten', 'Dairy', 'Eggs', 'Fish', 'Shellfish', 'Tree Nuts', 'Peanuts', 'Soy', 'Sesame'
-  ];
-
-  const dietaryOptions = [
-    'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Keto', 'Low-Carb', 'High-Protein', 'Organic'
-  ];
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!loading && !user) {
@@ -73,22 +124,51 @@ export default function CreateItemPage() {
 
   useEffect(() => {
     if (user) {
-      fetchOutlet();
+      fetchData();
     }
   }, [user]);
 
-  const fetchOutlet = async () => {
+  const fetchData = async () => {
     try {
-      const response = await axios.get('/api/outlets');
-      setOutlet(response.data.outlet);
+      const [outletResponse, quantitiesResponse] = await Promise.all([
+        axios.get('/api/outlets'),
+        axios.get('/api/quantities'),
+      ]);
       
-      if (!response.data.outlet) {
+      const outletData = outletResponse.data.outlet;
+      
+      if (!outletData) {
         router.push('/dashboard');
         return;
       }
+      
+      setOutlet(outletData);
+      setQuantities(quantitiesResponse.data.quantities || []);
+      
+      // Fetch categories after we have the outlet
+      const categoriesResponse = await axios.get(`/api/categories?outletId=${outletData._id}`);
+      setCategories(categoriesResponse.data.categories || []);
+      
+      const outlet = outletResponse.data.outlet;
+      
+      if (!outlet) {
+        router.push('/dashboard');
+        return;
+      }
+      
+      setOutlet(outlet);
+      setCategories(categoriesResponse.data.categories || []);
+      setQuantities(quantitiesResponse.data.quantities || []);
+      
+      // Fetch items for this outlet
+      const itemsResponse = await axios.get(`/api/items?outletId=${outlet._id}`);
+      setItems(itemsResponse.data.items || []);
+      
     } catch (error) {
-      console.error('Error fetching outlet:', error);
-      router.push('/dashboard');
+      console.error('Error fetching data:', error);
+      setCategories([]);
+      setQuantities([]);
+      setItems([]);
     } finally {
       setIsLoading(false);
     }
@@ -102,28 +182,164 @@ export default function CreateItemPage() {
     }
   };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({ ...prev, [name]: value }));
+    if (editErrors[name]) {
+      setEditErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
-  const handleAllergenChange = (allergen: string, checked: boolean) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setErrors(prev => ({ ...prev, image: '' }));
+
+    try {
+      // If there's an existing image, delete it from Cloudinary first
+      if (formData.image) {
+        await deleteExistingImage(formData.image);
+      }
+
+      // Upload to Cloudinary via our API
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+      uploadFormData.append('folder', 'menumaster/items');
+
+      const response = await fetch('/api/cloudinary/upload', {
+        method: 'POST',
+        body: uploadFormData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload image');
+      }
+
+      const data = await response.json();
+      setFormData(prev => ({ ...prev, image: data.data.secure_url }));
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      setErrors({ image: (error as Error).message || 'Failed to upload image. Please try again.' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setEditErrors(prev => ({ ...prev, image: '' }));
+
+    try {
+      // If there's an existing image, delete it from Cloudinary first
+      if (editFormData.image) {
+        await deleteExistingImage(editFormData.image);
+      }
+
+      // Upload to Cloudinary via our API
+      const uploadFormData = new FormData();
+      uploadFormData.append('file', file);
+      uploadFormData.append('folder', 'menumaster/items');
+
+      const response = await fetch('/api/cloudinary/upload', {
+        method: 'POST',
+        body: uploadFormData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload image');
+      }
+
+      const data = await response.json();
+      setEditFormData(prev => ({ ...prev, image: data.data.secure_url }));
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      setEditErrors({ image: (error as Error).message || 'Failed to upload image. Please try again.' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const deleteExistingImage = async (imageUrl: string) => {
+    try {
+      const urlParts = imageUrl.split('/');
+      const uploadIndex = urlParts.findIndex(part => part === 'upload');
+      if (uploadIndex === -1) return;
+      
+      const pathAfterUpload = urlParts.slice(uploadIndex + 2).join('/');
+      const publicId = pathAfterUpload.split('.')[0];
+
+      await axios.delete('/api/cloudinary/delete', {
+        data: { publicId }
+      });
+    } catch (error) {
+      console.error('Error deleting image from Cloudinary:', error);
+    }
+  };
+
+  const removeImage = async () => {
+    if (formData.image) {
+      await deleteExistingImage(formData.image);
+      setFormData(prev => ({ ...prev, image: '' }));
+    }
+  };
+
+  const removeEditImage = async () => {
+    if (editFormData.image) {
+      await deleteExistingImage(editFormData.image);
+      setEditFormData(prev => ({ ...prev, image: '' }));
+    }
+  };
+
+  const addQuantityPrice = () => {
     setFormData(prev => ({
       ...prev,
-      allergens: checked 
-        ? [...prev.allergens, allergen]
-        : prev.allergens.filter(a => a !== allergen)
+      quantityPrices: [...prev.quantityPrices, { quantityId: '', price: 0 }]
     }));
   };
 
-  const handleDietaryChange = (dietary: string, checked: boolean) => {
+  const removeQuantityPrice = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      dietaryInfo: checked 
-        ? [...prev.dietaryInfo, dietary]
-        : prev.dietaryInfo.filter(d => d !== dietary)
+      quantityPrices: prev.quantityPrices.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateQuantityPrice = (index: number, field: 'quantityId' | 'price', value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      quantityPrices: prev.quantityPrices.map((qp, i) => 
+        i === index ? { ...qp, [field]: value } : qp
+      )
+    }));
+  };
+
+  const addEditQuantityPrice = () => {
+    setEditFormData(prev => ({
+      ...prev,
+      quantityPrices: [...prev.quantityPrices, { quantityId: '', price: 0 }]
+    }));
+  };
+
+  const removeEditQuantityPrice = (index: number) => {
+    setEditFormData(prev => ({
+      ...prev,
+      quantityPrices: prev.quantityPrices.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateEditQuantityPrice = (index: number, field: 'quantityId' | 'price', value: string | number) => {
+    setEditFormData(prev => ({
+      ...prev,
+      quantityPrices: prev.quantityPrices.map((qp, i) => 
+        i === index ? { ...qp, [field]: value } : qp
+      )
     }));
   };
 
@@ -134,21 +350,74 @@ export default function CreateItemPage() {
       newErrors.name = 'Item name is required';
     }
 
+    if (formData.name.length > 100) {
+      newErrors.name = 'Item name must be less than 100 characters';
+    }
+
     if (!formData.description.trim()) {
       newErrors.description = 'Description is required';
     }
 
-    if (!formData.price.trim()) {
-      newErrors.price = 'Price is required';
-    } else if (isNaN(parseFloat(formData.price)) || parseFloat(formData.price) <= 0) {
-      newErrors.price = 'Price must be a valid positive number';
+    if (formData.description.length > 500) {
+      newErrors.description = 'Description must be less than 500 characters';
     }
 
-    if (!formData.category) {
-      newErrors.category = 'Category is required';
+    if (!formData.categoryId) {
+      newErrors.categoryId = 'Category is required';
+    }
+
+    if (formData.quantityPrices.length === 0) {
+      newErrors.quantityPrices = 'At least one quantity and price is required';
+    } else {
+      for (let i = 0; i < formData.quantityPrices.length; i++) {
+        const qp = formData.quantityPrices[i];
+        if (!qp.quantityId || !qp.price || qp.price <= 0) {
+          newErrors.quantityPrices = 'All quantity prices must have valid quantity and positive price';
+          break;
+        }
+      }
     }
 
     setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateEditForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!editFormData.name.trim()) {
+      newErrors.name = 'Item name is required';
+    }
+
+    if (editFormData.name.length > 100) {
+      newErrors.name = 'Item name must be less than 100 characters';
+    }
+
+    if (!editFormData.description.trim()) {
+      newErrors.description = 'Description is required';
+    }
+
+    if (editFormData.description.length > 500) {
+      newErrors.description = 'Description must be less than 500 characters';
+    }
+
+    if (!editFormData.categoryId) {
+      newErrors.categoryId = 'Category is required';
+    }
+
+    if (editFormData.quantityPrices.length === 0) {
+      newErrors.quantityPrices = 'At least one quantity and price is required';
+    } else {
+      for (let i = 0; i < editFormData.quantityPrices.length; i++) {
+        const qp = editFormData.quantityPrices[i];
+        if (!qp.quantityId || !qp.price || qp.price <= 0) {
+          newErrors.quantityPrices = 'All quantity prices must have valid quantity and positive price';
+          break;
+        }
+      }
+    }
+
+    setEditErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
@@ -157,18 +426,108 @@ export default function CreateItemPage() {
 
     setIsSaving(true);
     try {
-      // TODO: Implement API call to create menu item
-      console.log('Creating menu item:', formData);
+      const response = await axios.post('/api/items', {
+        ...formData,
+        outletId: outlet?._id,
+      });
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Add new item to the list
+      setItems(prev => [response.data.item, ...prev]);
       
-      // Redirect back to menu management
-      router.push('/dashboard/menu');
+      // Reset form and close modal
+      setFormData({
+        name: '',
+        description: '',
+        image: '',
+        categoryId: '',
+        isVeg: true,
+        quantityPrices: [],
+      });
+      setIsModalOpen(false);
     } catch (error: any) {
-      setErrors({ general: 'Failed to create menu item. Please try again.' });
+      if (error.response?.data?.error) {
+        setErrors({ general: error.response.data.error });
+      } else {
+        setErrors({ general: 'Failed to create item. Please try again.' });
+      }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleEdit = (item: Item) => {
+    setSelectedItem(item);
+    setEditFormData({
+      name: item.name,
+      description: item.description,
+      image: item.image || '',
+      categoryId: item.categoryId._id,
+      isVeg: item.isVeg,
+      quantityPrices: item.quantityPrices.map(qp => ({
+        quantityId: qp.quantityId._id,
+        price: qp.price,
+      })),
+    });
+    setEditErrors({});
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!validateEditForm() || !selectedItem) return;
+
+    setIsSaving(true);
+    try {
+      const response = await axios.put(`/api/items/${selectedItem._id}`, editFormData);
+      
+      // Update the item in the list
+      setItems(prev => prev.map(item => 
+        item._id === selectedItem._id ? response.data.item : item
+      ));
+      
+      // Close modal and reset form
+      setIsEditModalOpen(false);
+      setSelectedItem(null);
+      setEditFormData({
+        name: '',
+        description: '',
+        image: '',
+        categoryId: '',
+        isVeg: true,
+        quantityPrices: [],
+      });
+    } catch (error: any) {
+      if (error.response?.data?.error) {
+        setEditErrors({ general: error.response.data.error });
+      } else {
+        setEditErrors({ general: 'Failed to update item. Please try again.' });
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteClick = (item: Item) => {
+    setSelectedItem(item);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedItem) return;
+
+    setIsDeleting(true);
+    try {
+      await axios.delete(`/api/items/${selectedItem._id}`);
+      
+      // Remove the item from the list
+      setItems(prev => prev.filter(item => item._id !== selectedItem._id));
+      
+      // Close dialog and reset
+      setIsDeleteDialogOpen(false);
+      setSelectedItem(null);
+    } catch (error: any) {
+      console.error('Error deleting item:', error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -177,12 +536,18 @@ export default function CreateItemPage() {
     router.push('/');
   };
 
+  const filteredItems = items.filter(item =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.categoryId.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (loading || isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">Loading items...</p>
         </div>
       </div>
     );
@@ -196,7 +561,7 @@ export default function CreateItemPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50">
       <DashboardHeader outlet={outlet} onSignOut={handleSignOut} />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <Link href="/dashboard/menu">
@@ -205,341 +570,735 @@ export default function CreateItemPage() {
               Back to Menu Management
             </Button>
           </Link>
-          <div className="flex items-center space-x-3 mb-2">
-            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-              <Utensils className="h-6 w-6 text-white" />
-            </div>
+          
+          {/* Page Header with Search and Create Button */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Create Menu Item</h1>
-              <p className="text-gray-600">Add a delicious new item to your menu</p>
+              <h1 className="text-3xl font-bold text-gray-900">Menu Items</h1>
+              <p className="text-gray-600">Create and manage your delicious menu items</p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search items..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 w-full sm:w-80"
+                />
+              </div>
+              
+              {/* Create Item Button */}
+              <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 whitespace-nowrap">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Item
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Create New Menu Item</DialogTitle>
+                    <DialogDescription>
+                      Add a delicious new item to your menu
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="space-y-6 py-4">
+                    {errors.general && (
+                      <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                        <p className="text-sm text-red-600">{errors.general}</p>
+                      </div>
+                    )}
+
+                    {/* Image Upload */}
+                    <div className="space-y-3">
+                      <Label>Item Image</Label>
+                      {formData.image ? (
+                        <div className="relative">
+                          <img 
+                            src={formData.image} 
+                            alt="Item preview"
+                            className="w-full h-40 object-cover rounded-lg border-2 border-dashed border-gray-300"
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={removeImage}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg opacity-0 hover:opacity-100 transition-opacity">
+                            <Label htmlFor="image-upload" className="cursor-pointer">
+                              <div className="text-white text-center">
+                                <Upload className="h-6 w-6 mx-auto mb-2" />
+                                <span className="text-sm">Change Image</span>
+                              </div>
+                            </Label>
+                          </div>
+                        </div>
+                      ) : (
+                        <Label htmlFor="image-upload" className="cursor-pointer">
+                          <div className="w-full h-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-orange-400 hover:bg-orange-50 transition-colors">
+                            {isUploading ? (
+                              <>
+                                <Loader2 className="h-8 w-8 animate-spin text-orange-600 mb-2" />
+                                <span className="text-sm text-gray-600">Uploading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                                <span className="text-sm text-gray-600">Click to upload image</span>
+                                <span className="text-xs text-gray-400">PNG, JPG up to 5MB</span>
+                              </>
+                            )}
+                          </div>
+                        </Label>
+                      )}
+                      <input
+                        id="image-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        disabled={isUploading}
+                      />
+                      {errors.image && (
+                        <p className="text-sm text-red-500">{errors.image}</p>
+                      )}
+                    </div>
+
+                    {/* Item Name */}
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Item Name *</Label>
+                      <Input
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        placeholder="e.g., Grilled Chicken Sandwich"
+                        className={errors.name ? 'border-red-500' : ''}
+                      />
+                      {errors.name && (
+                        <p className="text-sm text-red-500">{errors.name}</p>
+                      )}
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description *</Label>
+                      <Textarea
+                        id="description"
+                        name="description"
+                        value={formData.description}
+                        onChange={handleInputChange}
+                        placeholder="Describe your delicious dish..."
+                        rows={3}
+                        className={errors.description ? 'border-red-500' : ''}
+                      />
+                      {errors.description && (
+                        <p className="text-sm text-red-500">{errors.description}</p>
+                      )}
+                      <p className="text-xs text-gray-500">
+                        {formData.description.length}/500 characters
+                      </p>
+                    </div>
+
+                    {/* Category and Veg/Non-Veg */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="categoryId">Category *</Label>
+                        <Select value={formData.categoryId} onValueChange={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}>
+                          <SelectTrigger className={errors.categoryId ? 'border-red-500' : ''}>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map(category => (
+                              <SelectItem key={category._id} value={category._id}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {errors.categoryId && (
+                          <p className="text-sm text-red-500">{errors.categoryId}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Type *</Label>
+                        <div className="flex space-x-4">
+                          <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="isVeg"
+                              checked={formData.isVeg === true}
+                              onChange={() => setFormData(prev => ({ ...prev, isVeg: true }))}
+                              className="text-green-600"
+                            />
+                            <Leaf className="h-4 w-4 text-green-600" />
+                            <span className="text-sm">Veg</span>
+                          </label>
+                          <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="isVeg"
+                              checked={formData.isVeg === false}
+                              onChange={() => setFormData(prev => ({ ...prev, isVeg: false }))}
+                              className="text-red-600"
+                            />
+                            <Beef className="h-4 w-4 text-red-600" />
+                            <span className="text-sm">Non-Veg</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quantity Prices */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label>Quantity & Pricing *</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addQuantityPrice}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add
+                        </Button>
+                      </div>
+                      
+                      {formData.quantityPrices.map((qp, index) => (
+                        <div key={index} className="flex gap-3 items-end">
+                          <div className="flex-1">
+                            <Select 
+                              value={qp.quantityId} 
+                              onValueChange={(value) => updateQuantityPrice(index, 'quantityId', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select quantity" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {quantities.map(quantity => (
+                                  <SelectItem key={quantity._id} value={quantity._id}>
+                                    {quantity.value} - {quantity.description}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex-1">
+                            <div className="relative">
+                              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                              <Input
+                                type="number"
+                                placeholder="Price"
+                                value={qp.price || ''}
+                                onChange={(e) => updateQuantityPrice(index, 'price', parseFloat(e.target.value) || 0)}
+                                className="pl-10"
+                                step="0.01"
+                                min="0"
+                              />
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeQuantityPrice(index)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      
+                      {formData.quantityPrices.length === 0 && (
+                        <p className="text-sm text-gray-500 text-center py-4 border-2 border-dashed border-gray-200 rounded-lg">
+                          No quantity prices added yet. Click "Add" to get started.
+                        </p>
+                      )}
+                      
+                      {errors.quantityPrices && (
+                        <p className="text-sm text-red-500">{errors.quantityPrices}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsModalOpen(false);
+                        setFormData({
+                          name: '',
+                          description: '',
+                          image: '',
+                          categoryId: '',
+                          isVeg: true,
+                          quantityPrices: [],
+                        });
+                        setErrors({});
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSave}
+                      disabled={isSaving || isUploading}
+                      className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Create Item
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Form */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Basic Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Basic Information</CardTitle>
-                <CardDescription>
-                  Essential details about your menu item
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {errors.general && (
-                  <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                    <p className="text-sm text-red-600">{errors.general}</p>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="name">Item Name *</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="e.g., Grilled Salmon with Herbs"
-                    className={errors.name ? 'border-red-500' : ''}
-                  />
-                  {errors.name && (
-                    <p className="text-sm text-red-500">{errors.name}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description *</Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    placeholder="Describe your dish, its ingredients, and what makes it special..."
-                    rows={3}
-                    className={errors.description ? 'border-red-500' : ''}
-                  />
-                  {errors.description && (
-                    <p className="text-sm text-red-500">{errors.description}</p>
-                  )}
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Price *</Label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="price"
-                        name="price"
-                        type="number"
-                        value={formData.price}
-                        onChange={handleInputChange}
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0"
-                        className={`pl-10 ${errors.price ? 'border-red-500' : ''}`}
+        {/* Items Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {filteredItems.length > 0 ? (
+            filteredItems.map((item) => (
+              <Card key={item._id} className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-orange-200">
+                <CardHeader className="p-0">
+                  <div className="relative">
+                    {item.image ? (
+                      <img 
+                        src={item.image} 
+                        alt={item.name}
+                        className="w-full h-48 object-cover rounded-t-lg"
                       />
+                    ) : (
+                      <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-orange-200 rounded-t-lg flex items-center justify-center">
+                        <Utensils className="h-12 w-12 text-orange-600" />
+                      </div>
+                    )}
+                    
+                    {/* Veg/Non-Veg Badge */}
+                    <div className="absolute top-2 left-2">
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                        item.isVeg 
+                          ? 'bg-green-100 border-green-600' 
+                          : 'bg-red-100 border-red-600'
+                      }`}>
+                        {item.isVeg ? (
+                          <div className="w-2 h-2 bg-green-600 rounded-full" />
+                        ) : (
+                          <div className="w-2 h-2 bg-red-600 rounded-full" />
+                        )}
+                      </div>
                     </div>
-                    {errors.price && (
-                      <p className="text-sm text-red-500">{errors.price}</p>
+                    
+                    {/* Actions Menu */}
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="bg-white/90 hover:bg-white shadow-md border border-gray-200 h-8 w-8 p-0"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48" sideOffset={5}>
+                          <DropdownMenuItem onClick={() => handleEdit(item)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Item
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteClick(item)}
+                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Item
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-lg text-gray-900 group-hover:text-orange-600 transition-colors line-clamp-1">
+                      {item.name}
+                    </h3>
+                    <Badge variant="secondary" className="ml-2 text-xs">
+                      {item.categoryId.name}
+                    </Badge>
+                  </div>
+                  
+                  <p className="text-gray-600 text-sm line-clamp-2 mb-3">
+                    {item.description}
+                  </p>
+                  
+                  {/* Pricing */}
+                  <div className="space-y-1">
+                    {item.quantityPrices.map((qp, index) => (
+                      <div key={index} className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">{qp.quantityId.value}</span>
+                        <span className="font-semibold text-orange-600">${qp.price.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <p className="text-xs text-gray-400 mt-3">
+                    Created {new Date(item.createdAt).toLocaleDateString()}
+                  </p>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="col-span-full text-center py-12">
+              {searchQuery ? (
+                <div>
+                  <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No items found</h3>
+                  <p className="text-gray-600">Try adjusting your search terms</p>
+                </div>
+              ) : (
+                <div>
+                  <Utensils className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No menu items yet</h3>
+                  <p className="text-gray-600 mb-4">Create your first delicious menu item to get started</p>
+                  <Button
+                    onClick={() => setIsModalOpen(true)}
+                    className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Item
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Edit Item Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Menu Item</DialogTitle>
+            <DialogDescription>
+              Update your menu item information
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {editErrors.general && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                <p className="text-sm text-red-600">{editErrors.general}</p>
+              </div>
+            )}
+
+            {/* Image Upload */}
+            <div className="space-y-3">
+              <Label>Item Image</Label>
+              {editFormData.image ? (
+                <div className="relative">
+                  <img 
+                    src={editFormData.image} 
+                    alt="Item preview"
+                    className="w-full h-40 object-cover rounded-lg border-2 border-dashed border-gray-300"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-2 right-2"
+                    onClick={removeEditImage}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg opacity-0 hover:opacity-100 transition-opacity">
+                    <Label htmlFor="edit-image-upload" className="cursor-pointer">
+                      <div className="text-white text-center">
+                        <Upload className="h-6 w-6 mx-auto mb-2" />
+                        <span className="text-sm">Change Image</span>
+                      </div>
+                    </Label>
+                  </div>
+                </div>
+              ) : (
+                <Label htmlFor="edit-image-upload" className="cursor-pointer">
+                  <div className="w-full h-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-orange-400 hover:bg-orange-50 transition-colors">
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="h-8 w-8 animate-spin text-orange-600 mb-2" />
+                        <span className="text-sm text-gray-600">Uploading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                        <span className="text-sm text-gray-600">Click to upload image</span>
+                        <span className="text-xs text-gray-400">PNG, JPG up to 5MB</span>
+                      </>
                     )}
                   </div>
+                </Label>
+              )}
+              <input
+                id="edit-image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleEditImageUpload}
+                className="hidden"
+                disabled={isUploading}
+              />
+              {editErrors.image && (
+                <p className="text-sm text-red-500">{editErrors.image}</p>
+              )}
+            </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category *</Label>
-                    <Select value={formData.category} onValueChange={(value) => handleSelectChange('category', value)}>
-                      <SelectTrigger className={errors.category ? 'border-red-500' : ''}>
-                        <SelectValue placeholder="Select category" />
+            {/* Item Name */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Item Name *</Label>
+              <Input
+                id="edit-name"
+                name="name"
+                value={editFormData.name}
+                onChange={handleEditInputChange}
+                placeholder="e.g., Grilled Chicken Sandwich"
+                className={editErrors.name ? 'border-red-500' : ''}
+              />
+              {editErrors.name && (
+                <p className="text-sm text-red-500">{editErrors.name}</p>
+              )}
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description *</Label>
+              <Textarea
+                id="edit-description"
+                name="description"
+                value={editFormData.description}
+                onChange={handleEditInputChange}
+                placeholder="Describe your delicious dish..."
+                rows={3}
+                className={editErrors.description ? 'border-red-500' : ''}
+              />
+              {editErrors.description && (
+                <p className="text-sm text-red-500">{editErrors.description}</p>
+              )}
+              <p className="text-xs text-gray-500">
+                {editFormData.description.length}/500 characters
+              </p>
+            </div>
+
+            {/* Category and Veg/Non-Veg */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-categoryId">Category *</Label>
+                <Select value={editFormData.categoryId} onValueChange={(value) => setEditFormData(prev => ({ ...prev, categoryId: value }))}>
+                  <SelectTrigger className={editErrors.categoryId ? 'border-red-500' : ''}>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(category => (
+                      <SelectItem key={category._id} value={category._id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {editErrors.categoryId && (
+                  <p className="text-sm text-red-500">{editErrors.categoryId}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Type *</Label>
+                <div className="flex space-x-4">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="edit-isVeg"
+                      checked={editFormData.isVeg === true}
+                      onChange={() => setEditFormData(prev => ({ ...prev, isVeg: true }))}
+                      className="text-green-600"
+                    />
+                    <Leaf className="h-4 w-4 text-green-600" />
+                    <span className="text-sm">Veg</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="edit-isVeg"
+                      checked={editFormData.isVeg === false}
+                      onChange={() => setEditFormData(prev => ({ ...prev, isVeg: false }))}
+                      className="text-red-600"
+                    />
+                    <Beef className="h-4 w-4 text-red-600" />
+                    <span className="text-sm">Non-Veg</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Quantity Prices */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Quantity & Pricing *</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addEditQuantityPrice}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              </div>
+              
+              {editFormData.quantityPrices.map((qp, index) => (
+                <div key={index} className="flex gap-3 items-end">
+                  <div className="flex-1">
+                    <Select 
+                      value={qp.quantityId} 
+                      onValueChange={(value) => updateEditQuantityPrice(index, 'quantityId', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select quantity" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map(category => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
+                        {quantities.map(quantity => (
+                          <SelectItem key={quantity._id} value={quantity._id}>
+                            {quantity.value} - {quantity.description}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    {errors.category && (
-                      <p className="text-sm text-red-500">{errors.category}</p>
-                    )}
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="quantitySet">Quantity Set (Optional)</Label>
-                  <Select value={formData.quantitySet} onValueChange={(value) => handleSelectChange('quantitySet', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select quantity options" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {quantitySets.map(set => (
-                        <SelectItem key={set.id} value={set.id}>
-                          {set.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="image">Image URL</Label>
-                  <Input
-                    id="image"
-                    name="image"
-                    value={formData.image}
-                    onChange={handleInputChange}
-                    placeholder="https://example.com/dish-image.jpg"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Additional Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Additional Details</CardTitle>
-                <CardDescription>
-                  Extra information about your menu item
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="ingredients">Ingredients</Label>
-                  <Textarea
-                    id="ingredients"
-                    name="ingredients"
-                    value={formData.ingredients}
-                    onChange={handleInputChange}
-                    placeholder="List the main ingredients..."
-                    rows={2}
-                  />
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="preparationTime">Preparation Time (minutes)</Label>
-                    <Input
-                      id="preparationTime"
-                      name="preparationTime"
-                      type="number"
-                      value={formData.preparationTime}
-                      onChange={handleInputChange}
-                      placeholder="15"
-                      min="0"
-                    />
+                  <div className="flex-1">
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        type="number"
+                        placeholder="Price"
+                        value={qp.price || ''}
+                        onChange={(e) => updateEditQuantityPrice(index, 'price', parseFloat(e.target.value) || 0)}
+                        className="pl-10"
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="calories">Calories (Optional)</Label>
-                    <Input
-                      id="calories"
-                      name="calories"
-                      type="number"
-                      value={formData.calories}
-                      onChange={handleInputChange}
-                      placeholder="350"
-                      min="0"
-                    />
-                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => removeEditQuantityPrice(index)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Allergens & Dietary Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Allergens & Dietary Information</CardTitle>
-                <CardDescription>
-                  Help customers make informed choices
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <Label>Allergens</Label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {allergenOptions.map(allergen => (
-                      <div key={allergen} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`allergen-${allergen}`}
-                          checked={formData.allergens.includes(allergen)}
-                          onCheckedChange={(checked) => handleAllergenChange(allergen, checked as boolean)}
-                        />
-                        <Label htmlFor={`allergen-${allergen}`} className="text-sm">
-                          {allergen}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Dietary Information</Label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {dietaryOptions.map(dietary => (
-                      <div key={dietary} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`dietary-${dietary}`}
-                          checked={formData.dietaryInfo.includes(dietary)}
-                          onCheckedChange={(checked) => handleDietaryChange(dietary, checked as boolean)}
-                        />
-                        <Label htmlFor={`dietary-${dietary}`} className="text-sm">
-                          {dietary}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex space-x-3">
-              <Button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Create Menu Item
-                  </>
-                )}
-              </Button>
-              <Link href="/dashboard/menu">
-                <Button variant="outline">Cancel</Button>
-              </Link>
+              ))}
+              
+              {editFormData.quantityPrices.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4 border-2 border-dashed border-gray-200 rounded-lg">
+                  No quantity prices added yet. Click "Add" to get started.
+                </p>
+              )}
+              
+              {editErrors.quantityPrices && (
+                <p className="text-sm text-red-500">{editErrors.quantityPrices}</p>
+              )}
             </div>
           </div>
 
-          {/* Preview */}
-          <div className="lg:col-span-1">
-            <Card className="sticky top-8">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Image className="h-5 w-5 mr-2" />
-                  Preview
-                </CardTitle>
-                <CardDescription>
-                  How your menu item will appear
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="border rounded-lg p-4 bg-white">
-                  {formData.image && (
-                    <img 
-                      src={formData.image} 
-                      alt="Item preview"
-                      className="w-full h-40 object-cover rounded-md mb-4"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  )}
-                  
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-start">
-                      <h3 className="font-semibold text-lg text-gray-900">
-                        {formData.name || 'Menu Item Name'}
-                      </h3>
-                      <span className="text-lg font-bold text-orange-600">
-                        ${formData.price || '0.00'}
-                      </span>
-                    </div>
-
-                    {formData.description && (
-                      <p className="text-gray-600 text-sm">
-                        {formData.description}
-                      </p>
-                    )}
-
-                    {(formData.allergens.length > 0 || formData.dietaryInfo.length > 0) && (
-                      <div className="space-y-2">
-                        {formData.dietaryInfo.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {formData.dietaryInfo.map(dietary => (
-                              <Badge key={dietary} variant="secondary" className="text-xs bg-green-100 text-green-800">
-                                {dietary}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {formData.allergens.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {formData.allergens.map(allergen => (
-                              <Badge key={allergen} variant="secondary" className="text-xs bg-red-100 text-red-800">
-                                {allergen}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {(formData.preparationTime || formData.calories) && (
-                      <div className="flex justify-between text-xs text-gray-500">
-                        {formData.preparationTime && (
-                          <span>⏱️ {formData.preparationTime} min</span>
-                        )}
-                        {formData.calories && (
-                          <span>🔥 {formData.calories} cal</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="flex justify-end space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditModalOpen(false);
+                setSelectedItem(null);
+                setEditFormData({
+                  name: '',
+                  description: '',
+                  image: '',
+                  categoryId: '',
+                  isVeg: true,
+                  quantityPrices: [],
+                });
+                setEditErrors({});
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditSave}
+              disabled={isSaving || isUploading}
+              className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Update Item
+                </>
+              )}
+            </Button>
           </div>
-        </div>
-      </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center">
+              <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
+              Delete Menu Item
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{selectedItem?.name}"? 
+              This action cannot be undone and will permanently remove the item and its associated image.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Item
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

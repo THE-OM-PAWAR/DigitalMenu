@@ -137,7 +137,8 @@ export default function MenuManagementPage() {
           </Card>
 
           {/* Create Item */}
-          <Card className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-2 hover:border-orange-200">
+          <Link href="/dashboard/menu/create-item">
+            <Card className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-2 hover:border-orange-200">
             <CardHeader className="text-center pb-4">
               <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-lg">
                 <Utensils className="h-10 w-10 text-white" />
@@ -150,14 +151,13 @@ export default function MenuManagementPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/dashboard/menu/create-item">
                 <Button className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white shadow-md hover:shadow-lg transition-all duration-300">
                   <Plus className="mr-2 h-4 w-4" />
                   Create Item
                 </Button>
-              </Link>
             </CardContent>
-          </Card>
+            </Card>
+          </Link>
         </div>
 
         {/* Quick Stats */}
