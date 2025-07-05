@@ -59,6 +59,7 @@
     "lucide-react": "^0.446.0",
     "mongoose": "^8.16.1",
     "next": "13.5.1",
+    "next-auth": "^4.24.11",
     "next-themes": "^0.3.0",
     "postcss": "8.4.30",
     "react": "18.2.0",
@@ -74,5 +75,8 @@
     "typescript": "5.2.2",
     "vaul": "^0.9.9",
     "zod": "^3.25.74"
+  },
+  "devDependencies": {
+    "@types/next-auth": "^3.13.0"
   }
 }
