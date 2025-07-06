@@ -39,8 +39,13 @@ async function connectDB() {
 
   try {
     cached.conn = await cached.promise;
+    
+    // Import all models to ensure they're registered
+    await import('@/lib/models');
+    
   } catch (e) {
     cached.promise = null;
+    console.error('MongoDB connection error:', e);
     throw e;
   }
 

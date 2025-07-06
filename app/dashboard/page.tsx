@@ -7,10 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Store, Plus, Menu, Users, QrCode, TrendingUp, Loader2, Link } from 'lucide-react';
+import { Store, Plus, Menu, Users, QrCode, TrendingUp, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardHeader from '@/components/DashboardHeader';
 import axios from 'axios';
+import Link from 'next/link';
 import { OutletInput, OutletSchema } from '@/lib/validations';
 
 interface Outlet {
@@ -178,7 +179,6 @@ export default function DashboardPage() {
             {/* Quick Actions */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card className="hover:shadow-lg transition-shadow duration-300 cursor-pointer">
-                <Link href="/dashboard/menu">
                 <CardHeader>
                   <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-lg flex items-center justify-center mb-4">
                     <Menu className="h-6 w-6 text-white" />
@@ -189,11 +189,12 @@ export default function DashboardPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button className="w-full">
-                    Get Started
-                  </Button>
+                  <Link href="/dashboard/menu">
+                    <Button className="w-full">
+                      Get Started
+                    </Button>
+                  </Link>
                 </CardContent>
-                </Link>
               </Card>
 
               <Card className="hover:shadow-lg transition-shadow duration-300 cursor-pointer">

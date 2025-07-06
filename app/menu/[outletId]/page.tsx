@@ -72,11 +72,33 @@ export default function PublicMenuPage() {
       setIsLoading(true);
       setError('');
 
-      const [outletResponse, categoriesResponse, itemsResponse] = await Promise.all([
+      console.log('Fetching menu data for outlet:', outletId);
+
+      // Validate outlet ID format on frontend
+      if (!outletId || outletId.length !== 24) {
+        setError('Invalid outlet ID format');
+        return;
+      }
+
+      const requests = [
         axios.get(`/api/public/outlets/${outletId}`),
         axios.get(`/api/public/categories?outletId=${outletId}`),
         axios.get(`/api/public/items?outletId=${outletId}`)
-      ]);
+      ];
+
+      const [outletResponse, categoriesResponse, itemsResponse] = await Promise.all(
+        requests.map(request => 
+          request.catch(err => {
+            console.error('API request failed:', err.response?.data || err.message);
+            throw err;
+          })
+        )
+      );
+
+      console.log('API responses received successfully');
+      console.log('Outlet:', outletResponse.data.outlet?.name);
+      console.log('Categories count:', categoriesResponse.data.categories?.length || 0);
+      console.log('Items count:', itemsResponse.data.items?.length || 0);
 
       setOutlet(outletResponse.data.outlet);
       setCategories(categoriesResponse.data.categories || []);
@@ -85,6 +107,8 @@ export default function PublicMenuPage() {
       console.error('Error fetching menu data:', error);
       if (error.response?.status === 404) {
         setError('Menu not found');
+      } else if (error.response?.status === 400) {
+        setError('Invalid outlet ID');
       } else {
         setError('Failed to load menu. Please try again later.');
       }
@@ -147,7 +171,15 @@ export default function PublicMenuPage() {
   }
 
   if (!outlet) {
-    return null;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <Store className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Outlet Not Found</h1>
+          <p className="text-gray-600 mb-6">The requested outlet could not be found.</p>
+        </div>
+      </div>
+    );
   }
 
   return (
