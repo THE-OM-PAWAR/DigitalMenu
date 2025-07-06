@@ -3,16 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { 
-  Utensils, ArrowLeft, Loader2, Save, Search, Plus, Upload, X, MoreHorizontal, 
-  Edit, Trash2, AlertTriangle, DollarSign, Leaf, Beef
+  Package, ArrowLeft, Loader2, Save, Search, Plus, MoreHorizontal, 
+  Edit, Trash2, AlertTriangle 
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -41,78 +39,34 @@ interface Outlet {
   logo?: string;
 }
 
-interface Category {
-  _id: string;
-  name: string;
-}
-
 interface Quantity {
   _id: string;
   value: string;
   description: string;
-}
-
-interface QuantityPrice {
-  quantityId: string;
-  price: number;
-}
-
-interface Item {
-  _id: string;
-  name: string;
-  description: string;
-  image?: string;
-  categoryId: {
-    _id: string;
-    name: string;
-  };
-  isVeg: boolean;
-  quantityPrices: {
-    quantityId: {
-      _id: string;
-      value: string;
-      description: string;
-    };
-    price: number;
-  }[];
   createdAt: string;
 }
 
-export default function CreateItemPage() {
+export default function CreateQuantityPage() {
   const { user, loading, signOut } = useAuth();
   const router = useRouter();
   const [outlet, setOutlet] = useState<Outlet | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [quantities, setQuantities] = useState<Quantity[]>([]);
-  const [items, setItems] = useState<Item[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [selectedQuantity, setSelectedQuantity] = useState<Quantity | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  
   const [formData, setFormData] = useState({
-    name: '',
+    value: '',
     description: '',
-    image: '',
-    categoryId: '',
-    isVeg: true,
-    quantityPrices: [] as QuantityPrice[],
   });
-  
   const [editFormData, setEditFormData] = useState({
-    name: '',
+    value: '',
     description: '',
-    image: '',
-    categoryId: '',
-    isVeg: true,
-    quantityPrices: [] as QuantityPrice[],
   });
-  
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
 
@@ -130,25 +84,7 @@ export default function CreateItemPage() {
 
   const fetchData = async () => {
     try {
-      const [outletResponse, quantitiesResponse] = await Promise.all([
-        axios.get('/api/outlets'),
-        axios.get('/api/quantities'),
-      ]);
-      
-      const outletData = outletResponse.data.outlet;
-      
-      if (!outletData) {
-        router.push('/dashboard');
-        return;
-      }
-      
-      setOutlet(outletData);
-      setQuantities(quantitiesResponse.data.quantities || []);
-      
-      // Fetch categories after we have the outlet
-      const categoriesResponse = await axios.get(`/api/categories?outletId=${outletData._id}`);
-      setCategories(categoriesResponse.data.categories || []);
-      
+      const outletResponse = await axios.get('/api/outlets');
       const outlet = outletResponse.data.outlet;
       
       if (!outlet) {
@@ -157,18 +93,14 @@ export default function CreateItemPage() {
       }
       
       setOutlet(outlet);
-      setCategories(categoriesResponse.data.categories || []);
-      setQuantities(quantitiesResponse.data.quantities || []);
       
-      // Fetch items for this outlet
-      const itemsResponse = await axios.get(`/api/items?outletId=${outlet._id}`);
-      setItems(itemsResponse.data.items || []);
+      // Fetch quantities for this outlet
+      const quantitiesResponse = await axios.get(`/api/quantities?outletId=${outlet._id}`);
+      setQuantities(quantitiesResponse.data.quantities || []);
       
     } catch (error) {
       console.error('Error fetching data:', error);
-      setCategories([]);
       setQuantities([]);
-      setItems([]);
     } finally {
       setIsLoading(false);
     }
@@ -190,192 +122,23 @@ export default function CreateItemPage() {
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    setErrors(prev => ({ ...prev, image: '' }));
-
-    try {
-      // If there's an existing image, delete it from Cloudinary first
-      if (formData.image) {
-        await deleteExistingImage(formData.image);
-      }
-
-      // Upload to Cloudinary via our API
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
-      uploadFormData.append('folder', 'menumaster/items');
-
-      const response = await fetch('/api/cloudinary/upload', {
-        method: 'POST',
-        body: uploadFormData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload image');
-      }
-
-      const data = await response.json();
-      setFormData(prev => ({ ...prev, image: data.data.secure_url }));
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      setErrors({ image: (error as Error).message || 'Failed to upload image. Please try again.' });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleEditImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    setEditErrors(prev => ({ ...prev, image: '' }));
-
-    try {
-      // If there's an existing image, delete it from Cloudinary first
-      if (editFormData.image) {
-        await deleteExistingImage(editFormData.image);
-      }
-
-      // Upload to Cloudinary via our API
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
-      uploadFormData.append('folder', 'menumaster/items');
-
-      const response = await fetch('/api/cloudinary/upload', {
-        method: 'POST',
-        body: uploadFormData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload image');
-      }
-
-      const data = await response.json();
-      setEditFormData(prev => ({ ...prev, image: data.data.secure_url }));
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      setEditErrors({ image: (error as Error).message || 'Failed to upload image. Please try again.' });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const deleteExistingImage = async (imageUrl: string) => {
-    try {
-      const urlParts = imageUrl.split('/');
-      const uploadIndex = urlParts.findIndex(part => part === 'upload');
-      if (uploadIndex === -1) return;
-      
-      const pathAfterUpload = urlParts.slice(uploadIndex + 2).join('/');
-      const publicId = pathAfterUpload.split('.')[0];
-
-      await axios.delete('/api/cloudinary/delete', {
-        data: { publicId }
-      });
-    } catch (error) {
-      console.error('Error deleting image from Cloudinary:', error);
-    }
-  };
-
-  const removeImage = async () => {
-    if (formData.image) {
-      await deleteExistingImage(formData.image);
-      setFormData(prev => ({ ...prev, image: '' }));
-    }
-  };
-
-  const removeEditImage = async () => {
-    if (editFormData.image) {
-      await deleteExistingImage(editFormData.image);
-      setEditFormData(prev => ({ ...prev, image: '' }));
-    }
-  };
-
-  const addQuantityPrice = () => {
-    setFormData(prev => ({
-      ...prev,
-      quantityPrices: [...prev.quantityPrices, { quantityId: '', price: 0 }]
-    }));
-  };
-
-  const removeQuantityPrice = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      quantityPrices: prev.quantityPrices.filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateQuantityPrice = (index: number, field: 'quantityId' | 'price', value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      quantityPrices: prev.quantityPrices.map((qp, i) => 
-        i === index ? { ...qp, [field]: value } : qp
-      )
-    }));
-  };
-
-  const addEditQuantityPrice = () => {
-    setEditFormData(prev => ({
-      ...prev,
-      quantityPrices: [...prev.quantityPrices, { quantityId: '', price: 0 }]
-    }));
-  };
-
-  const removeEditQuantityPrice = (index: number) => {
-    setEditFormData(prev => ({
-      ...prev,
-      quantityPrices: prev.quantityPrices.filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateEditQuantityPrice = (index: number, field: 'quantityId' | 'price', value: string | number) => {
-    setEditFormData(prev => ({
-      ...prev,
-      quantityPrices: prev.quantityPrices.map((qp, i) => 
-        i === index ? { ...qp, [field]: value } : qp
-      )
-    }));
-  };
-
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Item name is required';
-    }
-
-    if (formData.name.length > 100) {
-      newErrors.name = 'Item name must be less than 100 characters';
+    if (!formData.value.trim()) {
+      newErrors.value = 'Quantity value is required';
+    } else {
+      if (formData.value.length > 10) {
+        newErrors.value = 'Quantity value must be less than 10 characters';
+      }
     }
 
     if (!formData.description.trim()) {
       newErrors.description = 'Description is required';
     }
 
-    if (formData.description.length > 500) {
-      newErrors.description = 'Description must be less than 500 characters';
-    }
-
-    if (!formData.categoryId) {
-      newErrors.categoryId = 'Category is required';
-    }
-
-    if (formData.quantityPrices.length === 0) {
-      newErrors.quantityPrices = 'At least one quantity and price is required';
-    } else {
-      for (let i = 0; i < formData.quantityPrices.length; i++) {
-        const qp = formData.quantityPrices[i];
-        if (!qp.quantityId || !qp.price || qp.price <= 0) {
-          newErrors.quantityPrices = 'All quantity prices must have valid quantity and positive price';
-          break;
-        }
-      }
+    if (formData.description.length > 200) {
+      newErrors.description = 'Description must be less than 200 characters';
     }
 
     setErrors(newErrors);
@@ -385,36 +148,20 @@ export default function CreateItemPage() {
   const validateEditForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!editFormData.name.trim()) {
-      newErrors.name = 'Item name is required';
-    }
-
-    if (editFormData.name.length > 100) {
-      newErrors.name = 'Item name must be less than 100 characters';
+    if (!editFormData.value.trim()) {
+      newErrors.value = 'Quantity value is required';
+    } else {
+      if (editFormData.value.length > 50) {
+        newErrors.value = 'Quantity value must be less than 10 characters';
+      }
     }
 
     if (!editFormData.description.trim()) {
       newErrors.description = 'Description is required';
     }
 
-    if (editFormData.description.length > 500) {
-      newErrors.description = 'Description must be less than 500 characters';
-    }
-
-    if (!editFormData.categoryId) {
-      newErrors.categoryId = 'Category is required';
-    }
-
-    if (editFormData.quantityPrices.length === 0) {
-      newErrors.quantityPrices = 'At least one quantity and price is required';
-    } else {
-      for (let i = 0; i < editFormData.quantityPrices.length; i++) {
-        const qp = editFormData.quantityPrices[i];
-        if (!qp.quantityId || !qp.price || qp.price <= 0) {
-          newErrors.quantityPrices = 'All quantity prices must have valid quantity and positive price';
-          break;
-        }
-      }
+    if (editFormData.description.length > 200) {
+      newErrors.description = 'Description must be less than 200 characters';
     }
 
     setEditErrors(newErrors);
@@ -426,106 +173,89 @@ export default function CreateItemPage() {
 
     setIsSaving(true);
     try {
-      const response = await axios.post('/api/items', {
-        ...formData,
+      const response = await axios.post('/api/quantities', {
+        value: formData.value,
+        description: formData.description,
         outletId: outlet?._id,
       });
       
-      // Add new item to the list
-      setItems(prev => [response.data.item, ...prev]);
+      // Add new quantity to the list
+      setQuantities(prev => [response.data.quantity, ...prev]);
       
       // Reset form and close modal
-      setFormData({
-        name: '',
-        description: '',
-        image: '',
-        categoryId: '',
-        isVeg: true,
-        quantityPrices: [],
-      });
+      setFormData({ value: '', description: '' });
       setIsModalOpen(false);
     } catch (error: any) {
       if (error.response?.data?.error) {
         setErrors({ general: error.response.data.error });
       } else {
-        setErrors({ general: 'Failed to create item. Please try again.' });
+        setErrors({ general: 'Failed to create quantity. Please try again.' });
       }
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleEdit = (item: Item) => {
-    setSelectedItem(item);
+  const handleEdit = (quantity: Quantity) => {
+    setSelectedQuantity(quantity);
     setEditFormData({
-      name: item.name,
-      description: item.description,
-      image: item.image || '',
-      categoryId: item.categoryId._id,
-      isVeg: item.isVeg,
-      quantityPrices: item.quantityPrices.map(qp => ({
-        quantityId: qp.quantityId._id,
-        price: qp.price,
-      })),
+      value: quantity.value,
+      description: quantity.description,
     });
     setEditErrors({});
     setIsEditModalOpen(true);
   };
 
   const handleEditSave = async () => {
-    if (!validateEditForm() || !selectedItem) return;
+    if (!validateEditForm() || !selectedQuantity) return;
 
     setIsSaving(true);
     try {
-      const response = await axios.put(`/api/items/${selectedItem._id}`, editFormData);
+      const response = await axios.put(`/api/quantities/${selectedQuantity._id}`, {
+        value: editFormData.value,
+        description: editFormData.description,
+      });
       
-      // Update the item in the list
-      setItems(prev => prev.map(item => 
-        item._id === selectedItem._id ? response.data.item : item
+      // Update the quantity in the list
+      setQuantities(prev => prev.map(qty => 
+        qty._id === selectedQuantity._id ? response.data.quantity : qty
       ));
       
       // Close modal and reset form
       setIsEditModalOpen(false);
-      setSelectedItem(null);
-      setEditFormData({
-        name: '',
-        description: '',
-        image: '',
-        categoryId: '',
-        isVeg: true,
-        quantityPrices: [],
-      });
+      setSelectedQuantity(null);
+      setEditFormData({ value: '', description: '' });
     } catch (error: any) {
       if (error.response?.data?.error) {
         setEditErrors({ general: error.response.data.error });
       } else {
-        setEditErrors({ general: 'Failed to update item. Please try again.' });
+        setEditErrors({ general: 'Failed to update quantity. Please try again.' });
       }
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDeleteClick = (item: Item) => {
-    setSelectedItem(item);
+  const handleDeleteClick = (quantity: Quantity) => {
+    setSelectedQuantity(quantity);
     setIsDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!selectedItem) return;
+    if (!selectedQuantity) return;
 
     setIsDeleting(true);
     try {
-      await axios.delete(`/api/items/${selectedItem._id}`);
+      await axios.delete(`/api/quantities/${selectedQuantity._id}`);
       
-      // Remove the item from the list
-      setItems(prev => prev.filter(item => item._id !== selectedItem._id));
+      // Remove the quantity from the list
+      setQuantities(prev => prev.filter(qty => qty._id !== selectedQuantity._id));
       
       // Close dialog and reset
       setIsDeleteDialogOpen(false);
-      setSelectedItem(null);
+      setSelectedQuantity(null);
     } catch (error: any) {
-      console.error('Error deleting item:', error);
+      console.error('Error deleting quantity:', error);
     } finally {
       setIsDeleting(false);
     }
@@ -536,18 +266,17 @@ export default function CreateItemPage() {
     router.push('/');
   };
 
-  const filteredItems = items.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.categoryId.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredQuantities = quantities.filter(quantity =>
+    quantity.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    quantity.value.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading || isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading items...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-gray-900 mx-auto mb-4" />
+          <p className="text-gray-600">Loading quantities...</p>
         </div>
       </div>
     );
@@ -558,24 +287,24 @@ export default function CreateItemPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50">
+    <div className="min-h-screen bg-gray-50">
       <DashboardHeader outlet={outlet} onSignOut={handleSignOut} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <Link href="/dashboard/menu">
-            <Button variant="ghost" className="mb-4">
+            <Button variant="ghost" className="mb-4 text-gray-600 hover:text-gray-900">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Menu Management
+              Back to Menu
             </Button>
           </Link>
           
           {/* Page Header with Search and Create Button */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Menu Items</h1>
-              <p className="text-gray-600">Create and manage your delicious menu items</p>
+              <h1 className="text-3xl font-bold text-gray-900">Quantities</h1>
+              <p className="text-gray-600">Manage portion sizes</p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
@@ -583,26 +312,26 @@ export default function CreateItemPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search items..."
+                  placeholder="Search quantities..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-full sm:w-80"
+                  className="pl-10 w-full sm:w-80 border-gray-300"
                 />
               </div>
               
-              {/* Create Item Button */}
+              {/* Create Quantity Button */}
               <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 whitespace-nowrap">
+                  <Button className="bg-gray-900 hover:bg-gray-800 whitespace-nowrap">
                     <Plus className="h-4 w-4 mr-2" />
-                    Create Item
+                    Add Quantity
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                <DialogContent className="sm:max-w-[500px]">
                   <DialogHeader>
-                    <DialogTitle>Create New Menu Item</DialogTitle>
+                    <DialogTitle>Add Quantity</DialogTitle>
                     <DialogDescription>
-                      Add a delicious new item to your menu
+                      Create a new quantity option for your menu items
                     </DialogDescription>
                   </DialogHeader>
                   
@@ -613,78 +342,20 @@ export default function CreateItemPage() {
                       </div>
                     )}
 
-                    {/* Image Upload */}
-                    <div className="space-y-3">
-                      <Label>Item Image</Label>
-                      {formData.image ? (
-                        <div className="relative">
-                          <img 
-                            src={formData.image} 
-                            alt="Item preview"
-                            className="w-full h-40 object-cover rounded-lg border-2 border-dashed border-gray-300"
-                          />
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="absolute top-2 right-2"
-                            onClick={removeImage}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg opacity-0 hover:opacity-100 transition-opacity">
-                            <Label htmlFor="image-upload" className="cursor-pointer">
-                              <div className="text-white text-center">
-                                <Upload className="h-6 w-6 mx-auto mb-2" />
-                                <span className="text-sm">Change Image</span>
-                              </div>
-                            </Label>
-                          </div>
-                        </div>
-                      ) : (
-                        <Label htmlFor="image-upload" className="cursor-pointer">
-                          <div className="w-full h-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-orange-400 hover:bg-orange-50 transition-colors">
-                            {isUploading ? (
-                              <>
-                                <Loader2 className="h-8 w-8 animate-spin text-orange-600 mb-2" />
-                                <span className="text-sm text-gray-600">Uploading...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                                <span className="text-sm text-gray-600">Click to upload image</span>
-                                <span className="text-xs text-gray-400">PNG, JPG up to 5MB</span>
-                              </>
-                            )}
-                          </div>
-                        </Label>
-                      )}
-                      <input
-                        id="image-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        disabled={isUploading}
-                      />
-                      {errors.image && (
-                        <p className="text-sm text-red-500">{errors.image}</p>
-                      )}
-                    </div>
-
-                    {/* Item Name */}
+                    {/* Quantity Value */}
                     <div className="space-y-2">
-                      <Label htmlFor="name">Item Name *</Label>
+                      <Label htmlFor="value">Value *</Label>
                       <Input
-                        id="name"
-                        name="name"
-                        value={formData.name}
+                        id="value"
+                        name="value"
+                        type="text"
+                        value={formData.value}
                         onChange={handleInputChange}
-                        placeholder="e.g., Grilled Chicken Sandwich"
-                        className={errors.name ? 'border-red-500' : ''}
+                        placeholder="e.g., Small, Medium, Large"
+                        className={errors.value ? 'border-red-500' : 'border-gray-300'}
                       />
-                      {errors.name && (
-                        <p className="text-sm text-red-500">{errors.name}</p>
+                      {errors.value && (
+                        <p className="text-sm text-red-500">{errors.value}</p>
                       )}
                     </div>
 
@@ -696,136 +367,16 @@ export default function CreateItemPage() {
                         name="description"
                         value={formData.description}
                         onChange={handleInputChange}
-                        placeholder="Describe your delicious dish..."
+                        placeholder="e.g., Single serving, Double portion..."
                         rows={3}
-                        className={errors.description ? 'border-red-500' : ''}
+                        className={errors.description ? 'border-red-500' : 'border-gray-300'}
                       />
                       {errors.description && (
                         <p className="text-sm text-red-500">{errors.description}</p>
                       )}
                       <p className="text-xs text-gray-500">
-                        {formData.description.length}/500 characters
+                        {formData.description.length}/200 characters
                       </p>
-                    </div>
-
-                    {/* Category and Veg/Non-Veg */}
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="categoryId">Category *</Label>
-                        <Select value={formData.categoryId} onValueChange={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}>
-                          <SelectTrigger className={errors.categoryId ? 'border-red-500' : ''}>
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map(category => (
-                              <SelectItem key={category._id} value={category._id}>
-                                {category.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {errors.categoryId && (
-                          <p className="text-sm text-red-500">{errors.categoryId}</p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Type *</Label>
-                        <div className="flex space-x-4">
-                          <label className="flex items-center space-x-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="isVeg"
-                              checked={formData.isVeg === true}
-                              onChange={() => setFormData(prev => ({ ...prev, isVeg: true }))}
-                              className="text-green-600"
-                            />
-                            <Leaf className="h-4 w-4 text-green-600" />
-                            <span className="text-sm">Veg</span>
-                          </label>
-                          <label className="flex items-center space-x-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="isVeg"
-                              checked={formData.isVeg === false}
-                              onChange={() => setFormData(prev => ({ ...prev, isVeg: false }))}
-                              className="text-red-600"
-                            />
-                            <Beef className="h-4 w-4 text-red-600" />
-                            <span className="text-sm">Non-Veg</span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Quantity Prices */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label>Quantity & Pricing *</Label>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={addQuantityPrice}
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add
-                        </Button>
-                      </div>
-                      
-                      {formData.quantityPrices.map((qp, index) => (
-                        <div key={index} className="flex gap-3 items-end">
-                          <div className="flex-1">
-                            <Select 
-                              value={qp.quantityId} 
-                              onValueChange={(value) => updateQuantityPrice(index, 'quantityId', value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select quantity" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {quantities.map(quantity => (
-                                  <SelectItem key={quantity._id} value={quantity._id}>
-                                    {quantity.value} - {quantity.description}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex-1">
-                            <div className="relative">
-                              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                              <Input
-                                type="number"
-                                placeholder="Price"
-                                value={qp.price || ''}
-                                onChange={(e) => updateQuantityPrice(index, 'price', parseFloat(e.target.value) || 0)}
-                                className="pl-10"
-                                step="0.01"
-                                min="0"
-                              />
-                            </div>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeQuantityPrice(index)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      
-                      {formData.quantityPrices.length === 0 && (
-                        <p className="text-sm text-gray-500 text-center py-4 border-2 border-dashed border-gray-200 rounded-lg">
-                          No quantity prices added yet. Click "Add" to get started.
-                        </p>
-                      )}
-                      
-                      {errors.quantityPrices && (
-                        <p className="text-sm text-red-500">{errors.quantityPrices}</p>
-                      )}
                     </div>
                   </div>
 
@@ -834,14 +385,7 @@ export default function CreateItemPage() {
                       variant="outline"
                       onClick={() => {
                         setIsModalOpen(false);
-                        setFormData({
-                          name: '',
-                          description: '',
-                          image: '',
-                          categoryId: '',
-                          isVeg: true,
-                          quantityPrices: [],
-                        });
+                        setFormData({ value: '', description: '' });
                         setErrors({});
                       }}
                     >
@@ -849,8 +393,8 @@ export default function CreateItemPage() {
                     </Button>
                     <Button
                       onClick={handleSave}
-                      disabled={isSaving || isUploading}
-                      className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800"
+                      disabled={isSaving}
+                      className="bg-gray-900 hover:bg-gray-800"
                     >
                       {isSaving ? (
                         <>
@@ -860,7 +404,7 @@ export default function CreateItemPage() {
                       ) : (
                         <>
                           <Save className="mr-2 h-4 w-4" />
-                          Create Item
+                          Create
                         </>
                       )}
                     </Button>
@@ -871,118 +415,74 @@ export default function CreateItemPage() {
           </div>
         </div>
 
-        {/* Items Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredItems.length > 0 ? (
-            filteredItems.map((item) => (
-              <Card key={item._id} className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-orange-200">
-                <CardHeader className="p-0">
-                  <div className="relative">
-                    {item.image ? (
-                      <img 
-                        src={item.image} 
-                        alt={item.name}
-                        className="w-full h-48 object-cover rounded-t-lg"
-                      />
-                    ) : (
-                      <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-orange-200 rounded-t-lg flex items-center justify-center">
-                        <Utensils className="h-12 w-12 text-orange-600" />
-                      </div>
-                    )}
-                    
-                    {/* Veg/Non-Veg Badge */}
-                    <div className="absolute top-2 left-2">
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                        item.isVeg 
-                          ? 'bg-green-100 border-green-600' 
-                          : 'bg-red-100 border-red-600'
-                      }`}>
-                        {item.isVeg ? (
-                          <div className="w-2 h-2 bg-green-600 rounded-full" />
-                        ) : (
-                          <div className="w-2 h-2 bg-red-600 rounded-full" />
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Actions Menu */}
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="bg-white/90 hover:bg-white shadow-md border border-gray-200 h-8 w-8 p-0"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48" sideOffset={5}>
-                          <DropdownMenuItem onClick={() => handleEdit(item)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit Item
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => handleDeleteClick(item)}
-                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete Item
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+        {/* Quantities Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredQuantities.length > 0 ? (
+            filteredQuantities.map((quantity) => (
+              <Card key={quantity._id} className="group hover:shadow-md transition-all duration-300 cursor-pointer border-0 shadow-sm">
+                <div className="relative">
+                  <div className="w-full h-24 bg-gray-100 rounded-t-lg flex items-center justify-center">
+                    <div className="text-center">
+                      <Package className="h-6 w-6 text-gray-600 mx-auto mb-2" />
+                      <span className="text-lg font-semibold text-gray-700">{quantity.value}</span>
                     </div>
                   </div>
-                </CardHeader>
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="bg-white/90 hover:bg-white shadow-md border border-gray-200 h-8 w-8 p-0"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48" sideOffset={5}>
+                        <DropdownMenuItem onClick={() => handleEdit(quantity)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteClick(quantity)}
+                          className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold text-lg text-gray-900 group-hover:text-orange-600 transition-colors line-clamp-1">
-                      {item.name}
-                    </h3>
-                    <Badge variant="secondary" className="ml-2 text-xs">
-                      {item.categoryId.name}
-                    </Badge>
-                  </div>
-                  
-                  <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                    {item.description}
-                  </p>
-                  
-                  {/* Pricing */}
-                  <div className="space-y-1">
-                    {item.quantityPrices.map((qp, index) => (
-                      <div key={index} className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">{qp.quantityId.value}</span>
-                        <span className="font-semibold text-orange-600">${qp.price.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <p className="text-xs text-gray-400 mt-3">
-                    Created {new Date(item.createdAt).toLocaleDateString()}
+                  <h3 className="font-semibold text-lg text-gray-900 mb-2 group-hover:text-gray-700 transition-colors">
+                    {quantity.description}
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Created {new Date(quantity.createdAt).toLocaleDateString()}
                   </p>
                 </CardContent>
               </Card>
             ))
           ) : (
-            <div className="col-span-full text-center py-12">
+            <div className="col-span-full text-center py-16">
               {searchQuery ? (
                 <div>
                   <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No items found</h3>
-                  <p className="text-gray-600">Try adjusting your search terms</p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No quantities found</h3>
+                  <p className="text-gray-600">Try adjusting your search</p>
                 </div>
               ) : (
                 <div>
-                  <Utensils className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No menu items yet</h3>
-                  <p className="text-gray-600 mb-4">Create your first delicious menu item to get started</p>
+                  <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No quantities yet</h3>
+                  <p className="text-gray-600 mb-4">Create your first quantity option</p>
                   <Button
                     onClick={() => setIsModalOpen(true)}
-                    className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800"
+                    className="bg-gray-900 hover:bg-gray-800"
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Create Item
+                    Add Quantity
                   </Button>
                 </div>
               )}
@@ -991,13 +491,13 @@ export default function CreateItemPage() {
         </div>
       </div>
 
-      {/* Edit Item Modal */}
+      {/* Edit Quantity Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Edit Menu Item</DialogTitle>
+            <DialogTitle>Edit Quantity</DialogTitle>
             <DialogDescription>
-              Update your menu item information
+              Update your quantity information
             </DialogDescription>
           </DialogHeader>
           
@@ -1008,78 +508,20 @@ export default function CreateItemPage() {
               </div>
             )}
 
-            {/* Image Upload */}
-            <div className="space-y-3">
-              <Label>Item Image</Label>
-              {editFormData.image ? (
-                <div className="relative">
-                  <img 
-                    src={editFormData.image} 
-                    alt="Item preview"
-                    className="w-full h-40 object-cover rounded-lg border-2 border-dashed border-gray-300"
-                  />
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    className="absolute top-2 right-2"
-                    onClick={removeEditImage}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg opacity-0 hover:opacity-100 transition-opacity">
-                    <Label htmlFor="edit-image-upload" className="cursor-pointer">
-                      <div className="text-white text-center">
-                        <Upload className="h-6 w-6 mx-auto mb-2" />
-                        <span className="text-sm">Change Image</span>
-                      </div>
-                    </Label>
-                  </div>
-                </div>
-              ) : (
-                <Label htmlFor="edit-image-upload" className="cursor-pointer">
-                  <div className="w-full h-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-orange-400 hover:bg-orange-50 transition-colors">
-                    {isUploading ? (
-                      <>
-                        <Loader2 className="h-8 w-8 animate-spin text-orange-600 mb-2" />
-                        <span className="text-sm text-gray-600">Uploading...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                        <span className="text-sm text-gray-600">Click to upload image</span>
-                        <span className="text-xs text-gray-400">PNG, JPG up to 5MB</span>
-                      </>
-                    )}
-                  </div>
-                </Label>
-              )}
-              <input
-                id="edit-image-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleEditImageUpload}
-                className="hidden"
-                disabled={isUploading}
-              />
-              {editErrors.image && (
-                <p className="text-sm text-red-500">{editErrors.image}</p>
-              )}
-            </div>
-
-            {/* Item Name */}
+            {/* Quantity Value */}
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Item Name *</Label>
+              <Label htmlFor="edit-value">Value *</Label>
               <Input
-                id="edit-name"
-                name="name"
-                value={editFormData.name}
+                id="edit-value"
+                name="value"
+                type="text"
+                value={editFormData.value}
                 onChange={handleEditInputChange}
-                placeholder="e.g., Grilled Chicken Sandwich"
-                className={editErrors.name ? 'border-red-500' : ''}
+                placeholder="e.g., Small, Medium, Large"
+                className={editErrors.value ? 'border-red-500' : 'border-gray-300'}
               />
-              {editErrors.name && (
-                <p className="text-sm text-red-500">{editErrors.name}</p>
+              {editErrors.value && (
+                <p className="text-sm text-red-500">{editErrors.value}</p>
               )}
             </div>
 
@@ -1091,136 +533,16 @@ export default function CreateItemPage() {
                 name="description"
                 value={editFormData.description}
                 onChange={handleEditInputChange}
-                placeholder="Describe your delicious dish..."
+                placeholder="e.g., Single serving, Double portion..."
                 rows={3}
-                className={editErrors.description ? 'border-red-500' : ''}
+                className={editErrors.description ? 'border-red-500' : 'border-gray-300'}
               />
               {editErrors.description && (
                 <p className="text-sm text-red-500">{editErrors.description}</p>
               )}
               <p className="text-xs text-gray-500">
-                {editFormData.description.length}/500 characters
+                {editFormData.description.length}/200 characters
               </p>
-            </div>
-
-            {/* Category and Veg/Non-Veg */}
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-categoryId">Category *</Label>
-                <Select value={editFormData.categoryId} onValueChange={(value) => setEditFormData(prev => ({ ...prev, categoryId: value }))}>
-                  <SelectTrigger className={editErrors.categoryId ? 'border-red-500' : ''}>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map(category => (
-                      <SelectItem key={category._id} value={category._id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {editErrors.categoryId && (
-                  <p className="text-sm text-red-500">{editErrors.categoryId}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label>Type *</Label>
-                <div className="flex space-x-4">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="edit-isVeg"
-                      checked={editFormData.isVeg === true}
-                      onChange={() => setEditFormData(prev => ({ ...prev, isVeg: true }))}
-                      className="text-green-600"
-                    />
-                    <Leaf className="h-4 w-4 text-green-600" />
-                    <span className="text-sm">Veg</span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="edit-isVeg"
-                      checked={editFormData.isVeg === false}
-                      onChange={() => setEditFormData(prev => ({ ...prev, isVeg: false }))}
-                      className="text-red-600"
-                    />
-                    <Beef className="h-4 w-4 text-red-600" />
-                    <span className="text-sm">Non-Veg</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Quantity Prices */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Quantity & Pricing *</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addEditQuantityPrice}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add
-                </Button>
-              </div>
-              
-              {editFormData.quantityPrices.map((qp, index) => (
-                <div key={index} className="flex gap-3 items-end">
-                  <div className="flex-1">
-                    <Select 
-                      value={qp.quantityId} 
-                      onValueChange={(value) => updateEditQuantityPrice(index, 'quantityId', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select quantity" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {quantities.map(quantity => (
-                          <SelectItem key={quantity._id} value={quantity._id}>
-                            {quantity.value} - {quantity.description}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex-1">
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="number"
-                        placeholder="Price"
-                        value={qp.price || ''}
-                        onChange={(e) => updateEditQuantityPrice(index, 'price', parseFloat(e.target.value) || 0)}
-                        className="pl-10"
-                        step="0.01"
-                        min="0"
-                      />
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeEditQuantityPrice(index)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              
-              {editFormData.quantityPrices.length === 0 && (
-                <p className="text-sm text-gray-500 text-center py-4 border-2 border-dashed border-gray-200 rounded-lg">
-                  No quantity prices added yet. Click "Add" to get started.
-                </p>
-              )}
-              
-              {editErrors.quantityPrices && (
-                <p className="text-sm text-red-500">{editErrors.quantityPrices}</p>
-              )}
             </div>
           </div>
 
@@ -1229,15 +551,8 @@ export default function CreateItemPage() {
               variant="outline"
               onClick={() => {
                 setIsEditModalOpen(false);
-                setSelectedItem(null);
-                setEditFormData({
-                  name: '',
-                  description: '',
-                  image: '',
-                  categoryId: '',
-                  isVeg: true,
-                  quantityPrices: [],
-                });
+                setSelectedQuantity(null);
+                setEditFormData({ value: '', description: '' });
                 setEditErrors({});
               }}
             >
@@ -1245,8 +560,8 @@ export default function CreateItemPage() {
             </Button>
             <Button
               onClick={handleEditSave}
-              disabled={isSaving || isUploading}
-              className="bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800"
+              disabled={isSaving}
+              className="bg-gray-900 hover:bg-gray-800"
             >
               {isSaving ? (
                 <>
@@ -1256,7 +571,7 @@ export default function CreateItemPage() {
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Update Item
+                  Update
                 </>
               )}
             </Button>
@@ -1270,11 +585,11 @@ export default function CreateItemPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center">
               <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
-              Delete Menu Item
+              Delete Quantity
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{selectedItem?.name}"? 
-              This action cannot be undone and will permanently remove the item and its associated image.
+              Are you sure you want to delete "{selectedQuantity?.description}" with value {selectedQuantity?.value}? 
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1292,7 +607,7 @@ export default function CreateItemPage() {
               ) : (
                 <>
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Item
+                  Delete
                 </>
               )}
             </AlertDialogAction>
@@ -1301,4 +616,4 @@ export default function CreateItemPage() {
       </AlertDialog>
     </div>
   );
-} 
+}

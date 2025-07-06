@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -104,10 +104,6 @@ export default function CreateCategoryPage() {
       
     } catch (error) {
       console.error('Error fetching data:', error);
-      if (axios.isAxiosError(error)) {
-        console.error('Response data:', error.response?.data);
-        console.error('Response status:', error.response?.status);
-      }
       setCategories([]);
     } finally {
       setIsLoading(false);
@@ -380,9 +376,9 @@ export default function CreateCategoryPage() {
 
   if (loading || isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <Loader2 className="h-8 w-8 animate-spin text-gray-900 mx-auto mb-4" />
           <p className="text-gray-600">Loading categories...</p>
         </div>
       </div>
@@ -394,16 +390,16 @@ export default function CreateCategoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50">
+    <div className="min-h-screen bg-gray-50">
       <DashboardHeader outlet={outlet} onSignOut={handleSignOut} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <Link href="/dashboard/menu">
-            <Button variant="ghost" className="mb-4">
+            <Button variant="ghost" className="mb-4 text-gray-600 hover:text-gray-900">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Menu Management
+              Back to Menu
             </Button>
           </Link>
           
@@ -411,7 +407,7 @@ export default function CreateCategoryPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Categories</h1>
-              <p className="text-gray-600">Manage and organize your menu categories</p>
+              <p className="text-gray-600">Organize your menu</p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
@@ -422,23 +418,23 @@ export default function CreateCategoryPage() {
                   placeholder="Search categories..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-full sm:w-80"
+                  className="pl-10 w-full sm:w-80 border-gray-300"
                 />
               </div>
               
               {/* Create Category Button */}
               <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 whitespace-nowrap">
+                  <Button className="bg-gray-900 hover:bg-gray-800 whitespace-nowrap">
                     <Plus className="h-4 w-4 mr-2" />
-                    Create Category
+                    Add Category
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[500px]">
                   <DialogHeader>
-                    <DialogTitle>Create New Category</DialogTitle>
+                    <DialogTitle>Add Category</DialogTitle>
                     <DialogDescription>
-                      Add a new category to organize your menu items
+                      Create a new category to organize your menu
                     </DialogDescription>
                   </DialogHeader>
                   
@@ -451,13 +447,13 @@ export default function CreateCategoryPage() {
 
                     {/* Image Upload */}
                     <div className="space-y-3">
-                      <Label>Category Image</Label>
+                      <Label>Image (Optional)</Label>
                       {formData.image ? (
                         <div className="relative">
                           <img 
                             src={formData.image} 
                             alt="Category preview"
-                            className="w-full h-40 object-cover rounded-lg border-2 border-dashed border-gray-300"
+                            className="w-full h-32 object-cover rounded-lg border"
                           />
                           <Button
                             type="button"
@@ -468,28 +464,19 @@ export default function CreateCategoryPage() {
                           >
                             <X className="h-4 w-4" />
                           </Button>
-                          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg opacity-0 hover:opacity-100 transition-opacity">
-                            <Label htmlFor="image-upload" className="cursor-pointer">
-                              <div className="text-white text-center">
-                                <Upload className="h-6 w-6 mx-auto mb-2" />
-                                <span className="text-sm">Change Image</span>
-                              </div>
-                            </Label>
-                          </div>
                         </div>
                       ) : (
                         <Label htmlFor="image-upload" className="cursor-pointer">
-                          <div className="w-full h-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                          <div className="w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-gray-400 transition-colors">
                             {isUploading ? (
                               <>
-                                <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-2" />
+                                <Loader2 className="h-6 w-6 animate-spin text-gray-600 mb-2" />
                                 <span className="text-sm text-gray-600">Uploading...</span>
                               </>
                             ) : (
                               <>
-                                <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                                <span className="text-sm text-gray-600">Click to upload image</span>
-                                <span className="text-xs text-gray-400">PNG, JPG up to 5MB</span>
+                                <Upload className="h-6 w-6 text-gray-400 mb-2" />
+                                <span className="text-sm text-gray-600">Click to upload</span>
                               </>
                             )}
                           </div>
@@ -510,14 +497,14 @@ export default function CreateCategoryPage() {
 
                     {/* Category Name */}
                     <div className="space-y-2">
-                      <Label htmlFor="name">Category Name *</Label>
+                      <Label htmlFor="name">Name *</Label>
                       <Input
                         id="name"
                         name="name"
                         value={formData.name}
                         onChange={handleInputChange}
-                        placeholder="e.g., Appetizers, Main Courses, Desserts"
-                        className={errors.name ? 'border-red-500' : ''}
+                        placeholder="e.g., Appetizers, Main Courses"
+                        className={errors.name ? 'border-red-500' : 'border-gray-300'}
                       />
                       {errors.name && (
                         <p className="text-sm text-red-500">{errors.name}</p>
@@ -532,9 +519,9 @@ export default function CreateCategoryPage() {
                         name="description"
                         value={formData.description}
                         onChange={handleInputChange}
-                        placeholder="Brief description of this category..."
+                        placeholder="Brief description..."
                         rows={3}
-                        className={errors.description ? 'border-red-500' : ''}
+                        className={errors.description ? 'border-red-500' : 'border-gray-300'}
                       />
                       {errors.description && (
                         <p className="text-sm text-red-500">{errors.description}</p>
@@ -559,7 +546,7 @@ export default function CreateCategoryPage() {
                     <Button
                       onClick={handleSave}
                       disabled={isSaving || isUploading}
-                      className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                      className="bg-gray-900 hover:bg-gray-800"
                     >
                       {isSaving ? (
                         <>
@@ -569,7 +556,7 @@ export default function CreateCategoryPage() {
                       ) : (
                         <>
                           <Save className="mr-2 h-4 w-4" />
-                          Create Category
+                          Create
                         </>
                       )}
                     </Button>
@@ -581,21 +568,20 @@ export default function CreateCategoryPage() {
         </div>
 
         {/* Categories Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCategories.length > 0 ? (
             filteredCategories.map((category) => (
-              <Card key={category._id} className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-2 hover:border-blue-200">
-                <CardHeader className="p-0">
+              <Card key={category._id} className="group hover:shadow-md transition-all duration-300 cursor-pointer border-0 shadow-sm">
                 <div className="relative">
                   {category.image ? (
                     <img 
                       src={category.image} 
                       alt={category.name}
-                      className="w-full h-48 object-cover rounded-t-lg"
+                      className="w-full h-40 object-cover rounded-t-lg"
                     />
                   ) : (
-                    <div className="w-full h-48 bg-gradient-to-br from-blue-100 to-blue-200 rounded-t-lg flex items-center justify-center">
-                      <ChefHat className="h-12 w-12 text-blue-600" />
+                    <div className="w-full h-40 bg-gray-100 rounded-t-lg flex items-center justify-center">
+                      <ChefHat className="h-10 w-10 text-gray-400" />
                     </div>
                   )}
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -612,22 +598,21 @@ export default function CreateCategoryPage() {
                       <DropdownMenuContent align="end" className="w-48" sideOffset={5}>
                         <DropdownMenuItem onClick={() => handleEdit(category)}>
                           <Edit className="h-4 w-4 mr-2" />
-                          Edit Category
+                          Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={() => handleDeleteClick(category)}
                           className="text-red-600 focus:text-red-600 focus:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Category
+                          Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
                 </div>
-                </CardHeader>
                 <CardContent className="p-4">
-                  <h3 className="font-semibold text-lg text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+                  <h3 className="font-semibold text-lg text-gray-900 mb-2 group-hover:text-gray-700 transition-colors">
                     {category.name}
                   </h3>
                   {category.description && (
@@ -642,24 +627,24 @@ export default function CreateCategoryPage() {
               </Card>
             ))
           ) : (
-            <div className="col-span-full text-center py-12">
+            <div className="col-span-full text-center py-16">
               {searchQuery ? (
                 <div>
                   <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No categories found</h3>
-                  <p className="text-gray-600">Try adjusting your search terms</p>
+                  <p className="text-gray-600">Try adjusting your search</p>
                 </div>
               ) : (
                 <div>
                   <ChefHat className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">No categories yet</h3>
-                  <p className="text-gray-600 mb-4">Create your first category to get started</p>
+                  <p className="text-gray-600 mb-4">Create your first category</p>
                   <Button
                     onClick={() => setIsModalOpen(true)}
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                    className="bg-gray-900 hover:bg-gray-800"
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Create Category
+                    Add Category
                   </Button>
                 </div>
               )}
@@ -687,13 +672,13 @@ export default function CreateCategoryPage() {
 
             {/* Image Upload */}
             <div className="space-y-3">
-              <Label>Category Image</Label>
+              <Label>Image (Optional)</Label>
               {editFormData.image ? (
                 <div className="relative">
                   <img 
                     src={editFormData.image} 
                     alt="Category preview"
-                    className="w-full h-40 object-cover rounded-lg border-2 border-dashed border-gray-300"
+                    className="w-full h-32 object-cover rounded-lg border"
                   />
                   <Button
                     type="button"
@@ -704,28 +689,19 @@ export default function CreateCategoryPage() {
                   >
                     <X className="h-4 w-4" />
                   </Button>
-                  <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg opacity-0 hover:opacity-100 transition-opacity">
-                    <Label htmlFor="edit-image-upload" className="cursor-pointer">
-                      <div className="text-white text-center">
-                        <Upload className="h-6 w-6 mx-auto mb-2" />
-                        <span className="text-sm">Change Image</span>
-                      </div>
-                    </Label>
-                  </div>
                 </div>
               ) : (
                 <Label htmlFor="edit-image-upload" className="cursor-pointer">
-                  <div className="w-full h-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                  <div className="w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-gray-400 transition-colors">
                     {isUploading ? (
                       <>
-                        <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-2" />
+                        <Loader2 className="h-6 w-6 animate-spin text-gray-600 mb-2" />
                         <span className="text-sm text-gray-600">Uploading...</span>
                       </>
                     ) : (
                       <>
-                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                        <span className="text-sm text-gray-600">Click to upload image</span>
-                        <span className="text-xs text-gray-400">PNG, JPG up to 5MB</span>
+                        <Upload className="h-6 w-6 text-gray-400 mb-2" />
+                        <span className="text-sm text-gray-600">Click to upload</span>
                       </>
                     )}
                   </div>
@@ -746,14 +722,14 @@ export default function CreateCategoryPage() {
 
             {/* Category Name */}
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Category Name *</Label>
+              <Label htmlFor="edit-name">Name *</Label>
               <Input
                 id="edit-name"
                 name="name"
                 value={editFormData.name}
                 onChange={handleEditInputChange}
-                placeholder="e.g., Appetizers, Main Courses, Desserts"
-                className={editErrors.name ? 'border-red-500' : ''}
+                placeholder="e.g., Appetizers, Main Courses"
+                className={editErrors.name ? 'border-red-500' : 'border-gray-300'}
               />
               {editErrors.name && (
                 <p className="text-sm text-red-500">{editErrors.name}</p>
@@ -768,9 +744,9 @@ export default function CreateCategoryPage() {
                 name="description"
                 value={editFormData.description}
                 onChange={handleEditInputChange}
-                placeholder="Brief description of this category..."
+                placeholder="Brief description..."
                 rows={3}
-                className={editErrors.description ? 'border-red-500' : ''}
+                className={editErrors.description ? 'border-red-500' : 'border-gray-300'}
               />
               {editErrors.description && (
                 <p className="text-sm text-red-500">{editErrors.description}</p>
@@ -796,7 +772,7 @@ export default function CreateCategoryPage() {
             <Button
               onClick={handleEditSave}
               disabled={isSaving || isUploading}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+              className="bg-gray-900 hover:bg-gray-800"
             >
               {isSaving ? (
                 <>
@@ -806,7 +782,7 @@ export default function CreateCategoryPage() {
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Update Category
+                  Update
                 </>
               )}
             </Button>
@@ -823,8 +799,8 @@ export default function CreateCategoryPage() {
               Delete Category
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the category "{selectedCategory?.name}"? 
-              This action cannot be undone and will permanently remove the category and its associated image.
+              Are you sure you want to delete "{selectedCategory?.name}"? 
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -842,7 +818,7 @@ export default function CreateCategoryPage() {
               ) : (
                 <>
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Category
+                  Delete
                 </>
               )}
             </AlertDialogAction>

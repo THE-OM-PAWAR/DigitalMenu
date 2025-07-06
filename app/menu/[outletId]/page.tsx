@@ -143,10 +143,10 @@ export default function PublicMenuPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading delicious menu...</p>
+          <div className="w-16 h-16 border-4 border-gray-200 border-t-gray-900 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">Loading menu...</p>
         </div>
       </div>
     );
@@ -154,14 +154,14 @@ export default function PublicMenuPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center max-w-md mx-auto px-4">
           <Store className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Oops!</h1>
           <p className="text-gray-600 mb-6">{error}</p>
           <Button 
             onClick={fetchMenuData}
-            className="bg-orange-600 hover:bg-orange-700"
+            className="bg-gray-900 hover:bg-gray-800"
           >
             Try Again
           </Button>
@@ -172,7 +172,7 @@ export default function PublicMenuPage() {
 
   if (!outlet) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center max-w-md mx-auto px-4">
           <Store className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Outlet Not Found</h1>
@@ -183,14 +183,14 @@ export default function PublicMenuPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50">
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             {/* Outlet Info */}
             <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-16 h-16 bg-gray-900 rounded-xl flex items-center justify-center">
                 {outlet.logo ? (
                   <img 
                     src={outlet.logo} 
@@ -226,15 +226,15 @@ export default function PublicMenuPage() {
             {/* Quick Stats */}
             <div className="flex items-center space-x-6 text-center">
               <div>
-                <div className="text-2xl font-bold text-orange-600">{categories.length}</div>
+                <div className="text-2xl font-bold text-gray-900">{categories.length}</div>
                 <div className="text-xs text-gray-500">Categories</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-orange-600">{items.length}</div>
+                <div className="text-2xl font-bold text-gray-900">{items.length}</div>
                 <div className="text-xs text-gray-500">Items</div>
               </div>
               <div className="flex items-center">
-                <Star className="h-5 w-5 text-yellow-500 mr-1" />
+                <Star className="h-5 w-5 text-orange-500 mr-1" />
                 <span className="text-lg font-semibold">4.8</span>
               </div>
             </div>
@@ -243,31 +243,19 @@ export default function PublicMenuPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filters */}
-        <div className="mb-8 space-y-4">
-          {/* Search */}
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <Input
-              placeholder="Search for dishes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white/80 backdrop-blur-sm border-orange-200 focus:border-orange-400 focus:ring-orange-400"
-            />
-          </div>
-
-          {/* Filter Buttons */}
-          <div className="flex flex-wrap gap-3">
-            {/* Category Filter */}
-            <div className="flex flex-wrap gap-2">
+        {/* Categories Section */}
+        {categories.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Browse Categories</h2>
+            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
               <Button
                 variant={selectedCategory === 'all' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setSelectedCategory('all')}
-                className={selectedCategory === 'all' 
-                  ? 'bg-orange-600 hover:bg-orange-700' 
-                  : 'border-orange-200 text-orange-700 hover:bg-orange-50'
-                }
+                className={`flex-shrink-0 ${selectedCategory === 'all' 
+                  ? 'bg-gray-900 hover:bg-gray-800 text-white' 
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
               >
                 All Categories
               </Button>
@@ -277,25 +265,42 @@ export default function PublicMenuPage() {
                   variant={selectedCategory === category._id ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedCategory(category._id)}
-                  className={selectedCategory === category._id 
-                    ? 'bg-orange-600 hover:bg-orange-700' 
-                    : 'border-orange-200 text-orange-700 hover:bg-orange-50'
-                  }
+                  className={`flex-shrink-0 ${selectedCategory === category._id 
+                    ? 'bg-gray-900 hover:bg-gray-800 text-white' 
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
                 >
                   {category.name}
                 </Button>
               ))}
             </div>
+          </div>
+        )}
 
+        {/* Filters */}
+        <div className="mb-8 space-y-4">
+          {/* Search */}
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <Input
+              placeholder="Search for dishes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 border-gray-300 focus:border-gray-900 focus:ring-gray-900"
+            />
+          </div>
+
+          {/* Filter Buttons */}
+          <div className="flex flex-wrap gap-3">
             {/* Dietary Filter */}
-            <div className="flex gap-2 ml-auto">
+            <div className="flex gap-2">
               <Button
                 variant={dietaryFilter === 'all' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setDietaryFilter('all')}
                 className={dietaryFilter === 'all' 
                   ? 'bg-gray-600 hover:bg-gray-700' 
-                  : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                 }
               >
                 All
@@ -306,7 +311,7 @@ export default function PublicMenuPage() {
                 onClick={() => setDietaryFilter('veg')}
                 className={dietaryFilter === 'veg' 
                   ? 'bg-green-600 hover:bg-green-700' 
-                  : 'border-green-200 text-green-700 hover:bg-green-50'
+                  : 'border-green-300 text-green-700 hover:bg-green-50'
                 }
               >
                 <Leaf className="h-4 w-4 mr-1" />
@@ -317,8 +322,8 @@ export default function PublicMenuPage() {
                 size="sm"
                 onClick={() => setDietaryFilter('non-veg')}
                 className={dietaryFilter === 'non-veg' 
-                  ? 'bg-red-600 hover:bg-red-700' 
-                  : 'border-red-200 text-red-700 hover:bg-red-50'
+                  ? 'bg-orange-600 hover:bg-orange-700' 
+                  : 'border-orange-300 text-orange-700 hover:bg-orange-50'
                 }
               >
                 <Beef className="h-4 w-4 mr-1" />
@@ -332,7 +337,7 @@ export default function PublicMenuPage() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-gray-600">Active filters:</span>
               {searchQuery && (
-                <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                <Badge variant="secondary" className="bg-gray-100 text-gray-800">
                   Search: "{searchQuery}"
                   <X 
                     className="h-3 w-3 ml-1 cursor-pointer" 
@@ -341,7 +346,7 @@ export default function PublicMenuPage() {
                 </Badge>
               )}
               {selectedCategory !== 'all' && (
-                <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                <Badge variant="secondary" className="bg-gray-100 text-gray-800">
                   Category: {categories.find(c => c._id === selectedCategory)?.name}
                   <X 
                     className="h-3 w-3 ml-1 cursor-pointer" 
@@ -350,7 +355,7 @@ export default function PublicMenuPage() {
                 </Badge>
               )}
               {dietaryFilter !== 'all' && (
-                <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                <Badge variant="secondary" className="bg-gray-100 text-gray-800">
                   {dietaryFilter === 'veg' ? 'Vegetarian' : 'Non-Vegetarian'}
                   <X 
                     className="h-3 w-3 ml-1 cursor-pointer" 
@@ -366,7 +371,7 @@ export default function PublicMenuPage() {
                   setSelectedCategory('all');
                   setDietaryFilter('all');
                 }}
-                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                className="text-gray-600 hover:text-gray-900 hover:bg-gray-50"
               >
                 Clear all
               </Button>
@@ -386,11 +391,11 @@ export default function PublicMenuPage() {
                       <img 
                         src={category.image} 
                         alt={category.name}
-                        className="w-16 h-16 rounded-xl object-cover shadow-md"
+                        className="w-16 h-16 rounded-xl object-cover"
                       />
                     ) : (
-                      <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-red-400 rounded-xl flex items-center justify-center shadow-md">
-                        <ChefHat className="h-8 w-8 text-white" />
+                      <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center">
+                        <ChefHat className="h-8 w-8 text-gray-600" />
                       </div>
                     )}
                     <div>
@@ -398,7 +403,7 @@ export default function PublicMenuPage() {
                       {category.description && (
                         <p className="text-gray-600 mt-1">{category.description}</p>
                       )}
-                      <p className="text-sm text-orange-600 mt-1">{items.length} items</p>
+                      <p className="text-sm text-gray-500 mt-1">{items.length} items</p>
                     </div>
                   </div>
                 </div>
@@ -406,7 +411,7 @@ export default function PublicMenuPage() {
                 {/* Items Grid */}
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {items.map((item) => (
-                    <Card key={item._id} className="group hover:shadow-xl transition-all duration-300 border-0 shadow-md bg-white/80 backdrop-blur-sm overflow-hidden">
+                    <Card key={item._id} className="group hover:shadow-lg transition-all duration-300 border-0 shadow-sm bg-white overflow-hidden">
                       <div className="relative">
                         {item.image ? (
                           <img 
@@ -415,8 +420,8 @@ export default function PublicMenuPage() {
                             className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
-                          <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-red-100 flex items-center justify-center group-hover:from-orange-200 group-hover:to-red-200 transition-colors duration-300">
-                            <Utensils className="h-12 w-12 text-orange-400" />
+                          <div className="w-full h-48 bg-gray-50 flex items-center justify-center group-hover:bg-gray-100 transition-colors duration-300">
+                            <Utensils className="h-12 w-12 text-gray-400" />
                           </div>
                         )}
                         
@@ -425,10 +430,10 @@ export default function PublicMenuPage() {
                           <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
                             item.isVeg 
                               ? 'bg-green-100 border-green-600' 
-                              : 'bg-red-100 border-red-600'
+                              : 'bg-orange-100 border-orange-600'
                           }`}>
                             <div className={`w-2 h-2 rounded-full ${
-                              item.isVeg ? 'bg-green-600' : 'bg-red-600'
+                              item.isVeg ? 'bg-green-600' : 'bg-orange-600'
                             }`} />
                           </div>
                         </div>
@@ -443,7 +448,7 @@ export default function PublicMenuPage() {
 
                       <CardContent className="p-6">
                         <div className="mb-4">
-                          <h3 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-orange-600 transition-colors">
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-gray-700 transition-colors">
                             {item.name}
                           </h3>
                           <p className="text-gray-600 text-sm leading-relaxed line-clamp-3">
@@ -459,7 +464,7 @@ export default function PublicMenuPage() {
                                 <span className="font-medium text-gray-900">{qp.quantityId.value}</span>
                                 <span className="text-sm text-gray-500 ml-2">({qp.quantityId.description})</span>
                               </div>
-                              <span className="text-lg font-bold text-orange-600">
+                              <span className="text-lg font-bold text-gray-900">
                                 ₹{qp.price.toFixed(2)}
                               </span>
                             </div>
@@ -488,7 +493,7 @@ export default function PublicMenuPage() {
                       setSelectedCategory('all');
                       setDietaryFilter('all');
                     }}
-                    className="bg-orange-600 hover:bg-orange-700"
+                    className="bg-gray-900 hover:bg-gray-800"
                   >
                     Clear Filters
                   </Button>
@@ -508,11 +513,13 @@ export default function PublicMenuPage() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-white/80 backdrop-blur-md border-t mt-16">
+      <footer className="bg-gray-50 border-t border-gray-100 mt-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <div className="flex items-center justify-center space-x-2 mb-4">
-              <Store className="h-6 w-6 text-orange-600" />
+              <div className="w-6 h-6 bg-gray-900 rounded-lg flex items-center justify-center">
+                <Store className="h-4 w-4 text-white" />
+              </div>
               <span className="text-lg font-semibold text-gray-900">{outlet.name}</span>
             </div>
             <p className="text-gray-600 text-sm">

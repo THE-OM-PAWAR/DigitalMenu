@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Store, Settings, User, LogOut, Building, Settings2Icon, Settings2, SettingsIcon, Menu } from 'lucide-react';
+import { Store, Settings, User, LogOut, Menu, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 
@@ -29,14 +29,14 @@ export default function DashboardHeader({ outlet, onSignOut }: DashboardHeaderPr
   const { user } = useAuth();
 
   return (
-    <nav className="border-b bg-white/80 backdrop-blur-md sticky top-0 z-50">
+    <nav className="border-b border-gray-100 bg-white sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Left side - Outlet Logo and Name */}
           <div className="flex items-center space-x-3">
             {outlet ? (
               <>
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center">
                   {outlet.logo ? (
                     <img 
                       src={outlet.logo} 
@@ -44,7 +44,7 @@ export default function DashboardHeader({ outlet, onSignOut }: DashboardHeaderPr
                       className="w-8 h-8 rounded object-cover"
                     />
                   ) : (
-                    <Store className="h-6 w-6 text-white" />
+                    <Store className="h-5 w-5 text-white" />
                   )}
                 </div>
                 <div>
@@ -54,35 +54,35 @@ export default function DashboardHeader({ outlet, onSignOut }: DashboardHeaderPr
               </>
             ) : (
               <div className="flex items-center space-x-2">
-                <Store className="h-8 w-8 text-blue-600" />
-                <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
-                  MenuMaster
-                </span>
+                <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
+                  <Store className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-xl font-semibold text-gray-900">MenuMaster</span>
               </div>
             )}
           </div>
 
-          {/* Right side - Settings and Profile */}
+          {/* Right side - Navigation and Profile */}
           <div className="flex items-center space-x-4">
-            {/* Outlet Settings */}
+            {/* Navigation Links */}
             {outlet && (
-              <>
-              <Link href="/dashboard/menu">
-                <Button variant="ghost" size="sm" className="text-gray-700 hover:text-blue-600">
-                  <Menu className="h-5 w-5 mr-2" />
-                  Manage Menu
+              <div className="hidden md:flex items-center space-x-2">
+                <Link href="/dashboard/menu">
+                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+                    <Menu className="h-4 w-4 mr-2" />
+                    Menu
+                  </Button>
+                </Link>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-gray-600 hover:text-gray-900"
+                  onClick={() => window.open(`/menu/${outlet._id}`, '_blank')}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View
                 </Button>
-              </Link>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-gray-700 hover:text-orange-600"
-                onClick={() => window.open(`/menu/${outlet._id}`, '_blank')}
-              >
-                <Store className="h-5 w-5 mr-2" />
-                View Menu
-              </Button>
-              </>
+              </div>
             )}
 
             {/* User Profile Dropdown */}
@@ -91,7 +91,7 @@ export default function DashboardHeader({ outlet, onSignOut }: DashboardHeaderPr
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                   <Avatar className="h-10 w-10">
                     <AvatarImage src="" alt={user?.username} />
-                    <AvatarFallback className="bg-gradient-to-r from-blue-600 to-emerald-600 text-white">
+                    <AvatarFallback className="bg-gray-900 text-white">
                       {user?.username?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -109,12 +109,14 @@ export default function DashboardHeader({ outlet, onSignOut }: DashboardHeaderPr
                     <span>Profile</span>
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/outlet-settings" className="cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Outlet Settings</span>
-                  </Link>
-                </DropdownMenuItem>
+                {outlet && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/outlet-settings" className="cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onSignOut} className="cursor-pointer text-red-600">
                   <LogOut className="mr-2 h-4 w-4" />

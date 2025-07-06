@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Store, Plus, Menu, Users, QrCode, TrendingUp, Loader2 } from 'lucide-react';
+import { Store, Plus, Menu, Users, QrCode, TrendingUp, Loader2, ArrowRight, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardHeader from '@/components/DashboardHeader';
 import axios from 'axios';
@@ -97,9 +97,9 @@ export default function DashboardPage() {
 
   if (loading || isLoadingOutlet) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <Loader2 className="h-8 w-8 animate-spin text-gray-900 mx-auto mb-4" />
           <p className="text-gray-600">Loading dashboard...</p>
         </div>
       </div>
@@ -111,16 +111,20 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50">
+    <div className="min-h-screen bg-gray-50">
       <DashboardHeader outlet={outlet || undefined} onSignOut={handleSignOut} />
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {!outlet ? (
-          <div className="text-center py-12">
-            <Store className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Welcome to MenuMaster!</h3>
-            <p className="text-gray-600 mb-6">Get started by creating your outlet</p>
+          <div className="text-center py-16">
+            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Store className="h-8 w-8 text-gray-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Welcome to MenuMaster</h3>
+            <p className="text-gray-600 mb-8 max-w-md mx-auto">
+              Get started by creating your first outlet to manage your digital menu
+            </p>
           </div>
         ) : (
           <>
@@ -131,124 +135,111 @@ export default function DashboardPage() {
 
             {/* Quick Stats */}
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <Card>
+              <Card className="border-0 shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Menu Items</CardTitle>
-                  <Menu className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-gray-600">Menu Items</CardTitle>
+                  <Menu className="h-4 w-4 text-gray-400" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">0</div>
-                  <p className="text-xs text-muted-foreground">No items yet</p>
+                  <div className="text-2xl font-bold text-gray-900">0</div>
+                  <p className="text-xs text-gray-500">No items yet</p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-0 shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">QR Code Scans</CardTitle>
-                  <QrCode className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-gray-600">QR Scans</CardTitle>
+                  <QrCode className="h-4 w-4 text-gray-400" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">0</div>
-                  <p className="text-xs text-muted-foreground">This month</p>
+                  <div className="text-2xl font-bold text-gray-900">0</div>
+                  <p className="text-xs text-gray-500">This month</p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-0 shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Staff Members</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-gray-600">Team</CardTitle>
+                  <Users className="h-4 w-4 text-gray-400" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">1</div>
-                  <p className="text-xs text-muted-foreground">You (Admin)</p>
+                  <div className="text-2xl font-bold text-gray-900">1</div>
+                  <p className="text-xs text-gray-500">You (Admin)</p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-0 shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Performance</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-gray-600">Performance</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-gray-400" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">100%</div>
-                  <p className="text-xs text-muted-foreground">Uptime</p>
+                  <div className="text-2xl font-bold text-gray-900">100%</div>
+                  <p className="text-xs text-gray-500">Uptime</p>
                 </CardContent>
               </Card>
             </div>
 
             {/* Quick Actions */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="hover:shadow-lg transition-shadow duration-300 cursor-pointer">
+              <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
                 <CardHeader>
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-lg flex items-center justify-center mb-4">
-                    <Menu className="h-6 w-6 text-white" />
+                  <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-gray-200 transition-colors">
+                    <Menu className="h-6 w-6 text-gray-700" />
                   </div>
-                  <CardTitle>Manage Menu</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="text-lg">Manage Menu</CardTitle>
+                  <CardDescription className="text-gray-600">
                     Add, edit, and organize your menu items and categories
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Link href="/dashboard/menu">
-                    <Button className="w-full">
+                    <Button className="w-full bg-gray-900 hover:bg-gray-800">
                       Get Started
+                      <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                   </Link>
                 </CardContent>
               </Card>
 
-              <Card className="hover:shadow-lg transition-shadow duration-300 cursor-pointer">
+              <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
                 <CardHeader>
-                  <div className="w-12 h-12 bg-gradient-to-r from-emerald-600 to-blue-600 rounded-lg flex items-center justify-center mb-4">
-                    <QrCode className="h-6 w-6 text-white" />
+                  <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-gray-200 transition-colors">
+                    <QrCode className="h-6 w-6 text-gray-700" />
                   </div>
-                  <CardTitle>QR Codes</CardTitle>
-                  <CardDescription>
+                  <CardTitle className="text-lg">QR Codes</CardTitle>
+                  <CardDescription className="text-gray-600">
                     Generate and download QR codes for your tables
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full border-gray-300 hover:bg-gray-50">
                     Generate QR
                   </Button>
                 </CardContent>
               </Card>
 
-              <Card className="hover:shadow-lg transition-shadow duration-300 cursor-pointer">
+              <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
                 <CardHeader>
-                  <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg flex items-center justify-center mb-4">
-                    <TrendingUp className="h-6 w-6 text-white" />
+                  <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-orange-200 transition-colors">
+                    <ExternalLink className="h-6 w-6 text-orange-600" />
                   </div>
-                  <CardTitle>Analytics</CardTitle>
-                  <CardDescription>
-                    View insights and performance metrics
+                  <CardTitle className="text-lg">View Public Menu</CardTitle>
+                  <CardDescription className="text-gray-600">
+                    See how your menu looks to customers
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button variant="outline" className="w-full">
-                    View Analytics
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-orange-300 text-orange-600 hover:bg-orange-50"
+                    onClick={() => window.open(`/menu/${outlet._id}`, '_blank')}
+                  >
+                    Open Menu
+                    <ExternalLink className="ml-2 h-4 w-4" />
                   </Button>
                 </CardContent>
               </Card>
-
-              {outlet && (
-                <Card className="hover:shadow-lg transition-shadow duration-300 cursor-pointer">
-                  <CardHeader>
-                    <div className="w-12 h-12 bg-gradient-to-r from-orange-600 to-red-600 rounded-lg flex items-center justify-center mb-4">
-                      <Store className="h-6 w-6 text-white" />
-                    </div>
-                    <CardTitle>View Public Menu</CardTitle>
-                    <CardDescription>
-                      See how your menu looks to customers
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Button variant="outline" className="w-full" onClick={() => window.open(`/menu/${outlet._id}`, '_blank')}>
-                      Open Menu
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </>
         )}
@@ -258,8 +249,8 @@ export default function DashboardPage() {
       <Dialog open={isOnboardingOpen} onOpenChange={setIsOnboardingOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Create Your Outlet</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-xl font-bold">Create Your Outlet</DialogTitle>
+            <DialogDescription className="text-gray-600">
               Let's set up your digital menu. What's the name of your restaurant or cafe?
             </DialogDescription>
           </DialogHeader>
@@ -274,7 +265,7 @@ export default function DashboardPage() {
                   setOutletName(e.target.value);
                   if (outletError) setOutletError('');
                 }}
-                className={outletError ? 'border-red-500' : ''}
+                className={outletError ? 'border-red-500' : 'border-gray-300'}
               />
               {outletError && (
                 <p className="text-sm text-red-500">{outletError}</p>
@@ -282,7 +273,7 @@ export default function DashboardPage() {
             </div>
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700"
+              className="w-full bg-gray-900 hover:bg-gray-800"
               disabled={isCreatingOutlet}
             >
               {isCreatingOutlet ? (

@@ -56,7 +56,7 @@ export default function SignInPage() {
       if (error.response?.status === 401) {
         setAuthError('Invalid email or password');
       } else {
-        setAuthError('An error occurred. Please try again.');
+        setAuthError('Something went wrong. Please try again.');
       }
     } finally {
       setIsLoading(false);
@@ -64,22 +64,22 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center space-x-2 text-2xl font-bold text-gray-900">
-            <Store className="h-8 w-8 text-blue-600" />
-            <span className="bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
-              MenuMaster
-            </span>
+          <Link href="/" className="inline-flex items-center space-x-2 text-2xl font-semibold text-gray-900">
+            <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
+              <Store className="h-5 w-5 text-white" />
+            </div>
+            <span>MenuMaster</span>
           </Link>
-          <p className="text-gray-600 mt-2">Welcome back to your dashboard</p>
+          <p className="text-gray-600 mt-2">Welcome back</p>
         </div>
 
-        <Card className="shadow-xl border-0">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">Sign in</CardTitle>
-            <CardDescription className="text-center">
+        <Card className="border-0 shadow-lg">
+          <CardHeader className="space-y-1 text-center">
+            <CardTitle className="text-2xl font-bold">Sign in</CardTitle>
+            <CardDescription>
               Enter your credentials to access your account
             </CardDescription>
           </CardHeader>
@@ -94,7 +94,7 @@ export default function SignInPage() {
                   placeholder="john@example.com"
                   value={formData.email}
                   onChange={handleChange}
-                  className={errors.email ? 'border-red-500 focus:border-red-500' : ''}
+                  className={errors.email ? 'border-red-500 focus:border-red-500' : 'border-gray-300'}
                 />
                 {errors.email && (
                   <p className="text-sm text-red-500">{errors.email}</p>
@@ -111,7 +111,7 @@ export default function SignInPage() {
                     placeholder="Enter your password"
                     value={formData.password}
                     onChange={handleChange}
-                    className={errors.password ? 'border-red-500 focus:border-red-500 pr-10' : 'pr-10'}
+                    className={errors.password ? 'border-red-500 focus:border-red-500 pr-10' : 'border-gray-300 pr-10'}
                   />
                   <button
                     type="button"
@@ -134,7 +134,7 @@ export default function SignInPage() {
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700"
+                className="w-full bg-gray-900 hover:bg-gray-800"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -150,7 +150,7 @@ export default function SignInPage() {
 
             <div className="mt-6 text-center text-sm">
               <span className="text-gray-600">Don't have an account? </span>
-              <Link href="/auth/signup" className="font-medium text-blue-600 hover:text-blue-500">
+              <Link href="/auth/signup" className="font-medium text-gray-900 hover:text-orange-500">
                 Sign up
               </Link>
             </div>
