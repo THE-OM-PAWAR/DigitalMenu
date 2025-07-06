@@ -39,7 +39,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { orderStatus, paymentStatus, comments } = body;
+    const { orderStatus, paymentStatus, comments, items, totalAmount } = body;
 
     await connectDB();
 
@@ -57,6 +57,12 @@ export async function PUT(
     }
     if (comments !== undefined) {
       order.comments = comments;
+    }
+    if (items && Array.isArray(items)) {
+      order.items = items;
+    }
+    if (totalAmount !== undefined) {
+      order.totalAmount = totalAmount;
     }
 
     order.timestamps.updated = new Date();

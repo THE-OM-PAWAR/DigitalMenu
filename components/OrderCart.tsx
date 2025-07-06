@@ -43,7 +43,7 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
   const [isUpdatingOrder, setIsUpdatingOrder] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [editOrderItems, setEditOrderItems] = useState<OrderItem[]>([]);
-  const { socket } = useSocket(outletId);
+  const { socket, isConnected } = useSocket(outletId);
 
   const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -92,17 +92,33 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
     }
   }, [outletId]);
 
-  // Socket listener for order updates
+  // Socket event listeners for real-time updates
   useEffect(() => {
-    if (socket && activeOrder) {
+    if (socket && outletId) {
+      console.log('Setting up socket listeners for outlet:', outletId);
+      
+      // Join outlet room for real-time updates
+      socket.emit('join-outlet', outletId);
+
+      // Listen for new orders (for managers)
+      socket.on('new-order', (order: Order) => {
+        console.log('Received new order:', order);
+        // This is mainly for the manager side
+      });
+
+      // Listen for order updates (for customers)
       socket.on('order-updated', (updatedOrder: Order) => {
-        if (updatedOrder.orderId === activeOrder.order.orderId) {
+        console.log('Received order update:', updatedOrder);
+        
+        if (activeOrder && updatedOrder.orderId === activeOrder.order.orderId) {
           const canEdit = canEditOrder(updatedOrder.orderStatus, updatedOrder.paymentStatus);
           const isCompleted = isOrderCompleted(updatedOrder.orderStatus, updatedOrder.paymentStatus);
           
           if (isCompleted) {
+            console.log('Order completed, moving to history');
             moveOrderToHistory(updatedOrder);
           } else {
+            console.log('Updating active order');
             const newActiveOrder = { order: updatedOrder, canEdit };
             setActiveOrder(newActiveOrder);
             localStorage.setItem(`activeOrder-${outletId}`, JSON.stringify(updatedOrder));
@@ -110,13 +126,26 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
         }
       });
 
+      // Listen for order completion
+      socket.on('order-completed', (completedOrder: Order) => {
+        console.log('Received order completion:', completedOrder);
+        
+        if (activeOrder && completedOrder.orderId === activeOrder.order.orderId) {
+          moveOrderToHistory(completedOrder);
+        }
+      });
+
       return () => {
+        console.log('Cleaning up socket listeners');
+        socket.off('new-order');
         socket.off('order-updated');
+        socket.off('order-completed');
       };
     }
   }, [socket, activeOrder, outletId]);
 
   const moveOrderToHistory = (order: Order) => {
+    console.log('Moving order to history:', order.orderId);
     setOrderHistory(prev => {
       const newHistory = [order, ...prev.filter(h => h.orderId !== order.orderId)];
       localStorage.setItem(`orderHistory-${outletId}`, JSON.stringify(newHistory));
@@ -169,7 +198,9 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
       const response = await axios.post('/api/orders', orderData);
       const newOrder = response.data.order;
 
-      // Emit socket event for real-time update
+      console.log('Order submitted:', newOrder);
+
+      // Emit socket event for real-time update to manager
       if (socket) {
         socket.emit('new-order', newOrder);
       }
@@ -218,18 +249,16 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
     try {
       const newTotalAmount = editOrderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       
-      // Here you would typically call an API to update the order
-      // For now, we'll update locally and emit socket event
-      const updatedOrder = {
-        ...editingOrder,
+      // Update order via API
+      const response = await axios.put(`/api/orders/${editingOrder.orderId}`, {
         items: editOrderItems,
         totalAmount: newTotalAmount,
-        timestamps: {
-          ...editingOrder.timestamps,
-          updated: new Date(),
-        }
-      };
+      });
 
+      const updatedOrder = response.data.order;
+      console.log('Order updated:', updatedOrder);
+
+      // Emit socket event for real-time update
       if (socket) {
         socket.emit('order-updated', updatedOrder);
       }
@@ -338,6 +367,8 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                             activeOrder.order.orderStatus === OrderStatus.PREPARING ? '#3b82f6' :
                             activeOrder.order.orderStatus === OrderStatus.PREPARED ? '#10b981' : '#6b7280'
                     }} />
+                    {/* Connection indicator */}
+                    <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900">Order {activeOrder.order.orderId.split('-')[1]}</p>
@@ -347,6 +378,9 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                       </Badge>
                       <Badge variant="outline" className="text-xs">
                         ₹{activeOrder.order.totalAmount.toFixed(2)}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {activeOrder.order.paymentStatus}
                       </Badge>
                     </div>
                   </div>
@@ -678,6 +712,9 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                         <div className="text-right">
                           <Badge variant="secondary" className="mb-1">
                             {activeOrder.order.orderStatus}
+                          </Badge>
+                          <Badge variant="outline" className="mb-1 ml-1">
+                            {activeOrder.order.paymentStatus}
                           </Badge>
                           <p className="font-bold">₹{activeOrder.order.totalAmount.toFixed(2)}</p>
                         </div>

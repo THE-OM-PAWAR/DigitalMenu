@@ -63,11 +63,18 @@ export default function OrdersPage() {
   // Socket event listeners for real-time updates
   useEffect(() => {
     if (socket && outlet) {
+      console.log('Setting up socket listeners for orders page');
+      
+      // Join outlet room
+      socket.emit('join-outlet', outlet._id);
+
       socket.on('new-order', (order: Order) => {
+        console.log('Manager received new order:', order);
         setOrders(prev => [order, ...prev]);
       });
 
       socket.on('order-updated', (updatedOrder: Order) => {
+        console.log('Manager received order update:', updatedOrder);
         setOrders(prev => prev.map(order => 
           order.orderId === updatedOrder.orderId ? updatedOrder : order
         ));
@@ -76,9 +83,21 @@ export default function OrdersPage() {
         }
       });
 
+      socket.on('order-completed', (completedOrder: Order) => {
+        console.log('Manager received order completion:', completedOrder);
+        setOrders(prev => prev.map(order => 
+          order.orderId === completedOrder.orderId ? completedOrder : order
+        ));
+        if (selectedOrder?.orderId === completedOrder.orderId) {
+          setSelectedOrder(completedOrder);
+        }
+      });
+
       return () => {
+        console.log('Cleaning up socket listeners for orders page');
         socket.off('new-order');
         socket.off('order-updated');
+        socket.off('order-completed');
       };
     }
   }, [socket, outlet, selectedOrder]);
@@ -114,8 +133,9 @@ export default function OrdersPage() {
       });
 
       const updatedOrder = response.data.order;
+      console.log('Order status updated:', updatedOrder);
       
-      // Emit socket event
+      // Emit socket event for real-time update to customer
       if (socket) {
         socket.emit('order-updated', updatedOrder);
       }
@@ -163,18 +183,21 @@ export default function OrdersPage() {
         paymentStatus: PaymentStatus.PAID
       });
 
-      const updatedOrder = response.data.order;
+      const completedOrder = response.data.order;
+      console.log('Order completed:', completedOrder);
       
+      // Emit socket event for real-time update to customer
       if (socket) {
-        socket.emit('order-updated', updatedOrder);
+        socket.emit('order-completed', completedOrder);
+        socket.emit('order-updated', completedOrder);
       }
 
       setOrders(prev => prev.map(order => 
-        order.orderId === orderId ? updatedOrder : order
+        order.orderId === orderId ? completedOrder : order
       ));
       
       if (selectedOrder?.orderId === orderId) {
-        setSelectedOrder(updatedOrder);
+        setSelectedOrder(completedOrder);
       }
     } catch (error) {
       console.error('Error completing order:', error);
@@ -212,13 +235,19 @@ export default function OrdersPage() {
     }
   };
 
+  // Fixed completion logic - both conditions must be true
   const canCompleteOrder = (order: Order) => {
-    return (order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.UNPAID) ||
-           (order.orderStatus === OrderStatus.PREPARED && order.paymentStatus === PaymentStatus.PAID);
+    return order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.PAID;
   };
 
   const isOrderCompleted = (order: Order) => {
     return order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.PAID;
+  };
+
+  // Check if order can be marked as complete (either served+unpaid OR prepared+paid)
+  const canMarkComplete = (order: Order) => {
+    return (order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.UNPAID) ||
+           (order.orderStatus === OrderStatus.PREPARED && order.paymentStatus === PaymentStatus.PAID);
   };
 
   const handleOrderClick = (order: Order) => {
@@ -537,13 +566,19 @@ function OrderDetailsPanel({
     }
   };
 
+  // Fixed completion logic - both conditions must be true
   const canCompleteOrder = (order: Order) => {
-    return (order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.UNPAID) ||
-           (order.orderStatus === OrderStatus.PREPARED && order.paymentStatus === PaymentStatus.PAID);
+    return order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.PAID;
   };
 
   const isOrderCompleted = (order: Order) => {
     return order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.PAID;
+  };
+
+  // Check if order can be marked as complete (either served+unpaid OR prepared+paid)
+  const canMarkComplete = (order: Order) => {
+    return (order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.UNPAID) ||
+           (order.orderStatus === OrderStatus.PREPARED && order.paymentStatus === PaymentStatus.PAID);
   };
 
   return (
@@ -659,25 +694,33 @@ function OrderDetailsPanel({
               </div>
             </div>
 
-            {/* Complete Order Button */}
-            {canCompleteOrder(order) && (
-              <Button
-                onClick={() => onCompleteOrder(order.orderId)}
-                disabled={isUpdating}
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
-              >
-                {isUpdating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Completing...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Complete Order
-                  </>
-                )}
-              </Button>
+            {/* Complete Order Button - Only show if both served AND paid */}
+            {canMarkComplete(order) && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-sm text-yellow-800 mb-3">
+                  {order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.UNPAID
+                    ? "Order is served but payment is pending. Mark as paid to complete."
+                    : "Order is prepared and paid. Mark as served to complete."
+                  }
+                </p>
+                <Button
+                  onClick={() => onCompleteOrder(order.orderId)}
+                  disabled={isUpdating}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {isUpdating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Completing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Complete Order
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
         )}
