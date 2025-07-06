@@ -27,7 +27,8 @@ app.prepare().then(() => {
     },
     transports: ['websocket', 'polling'],
     pingTimeout: 60000,
-    pingInterval: 25000
+    pingInterval: 25000,
+    allowEIO3: true
   });
 
   // Store connected clients by outlet
@@ -37,6 +38,13 @@ app.prepare().then(() => {
   // Socket.IO event handlers
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
+
+    // Send immediate connection confirmation
+    socket.emit('connection-confirmed', {
+      socketId: socket.id,
+      timestamp: Date.now(),
+      server: 'MenuMaster Socket Server'
+    });
 
     // Handle joining outlet rooms
     socket.on('join-outlet', (outletId) => {
@@ -195,7 +203,7 @@ app.prepare().then(() => {
       });
       
       orderRooms.forEach((clients, orderRoom) => {
-        if (clients.has(socket.id)) {
+        if (clients.has(orderRoom)) {
           clients.delete(socket.id);
           if (clients.size === 0) {
             orderRooms.delete(orderRoom);
@@ -207,13 +215,6 @@ app.prepare().then(() => {
     // Handle connection errors
     socket.on('error', (error) => {
       console.error('Socket error for client', socket.id, ':', error);
-    });
-
-    // Send initial connection confirmation
-    socket.emit('connection-confirmed', {
-      socketId: socket.id,
-      timestamp: Date.now(),
-      server: 'MenuMaster Socket Server'
     });
   });
 

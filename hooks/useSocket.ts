@@ -16,7 +16,8 @@ export function useSocket(outletId?: string) {
 
     console.log('Initializing socket connection for outlet:', outletId);
     
-    const socketInstance = io(process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3000', {
+    // Create socket connection with explicit configuration
+    const socketInstance = io({
       path: '/api/socket',
       transports: ['websocket', 'polling'],
       timeout: 20000,
@@ -24,6 +25,8 @@ export function useSocket(outletId?: string) {
       reconnectionAttempts: maxReconnectAttempts,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
+      forceNew: false, // Changed to false to reuse connections
+      autoConnect: true,
     });
 
     const setupHeartbeat = () => {
@@ -42,7 +45,8 @@ export function useSocket(outletId?: string) {
     };
 
     socketInstance.on('connect', () => {
-      console.log('Connected to socket server');
+      console.log('Socket connected successfully with ID:', socketInstance.id);
+      console.log('Socket connected status:', socketInstance.connected);
       setIsConnected(true);
       reconnectAttemptsRef.current = 0;
       
@@ -62,7 +66,8 @@ export function useSocket(outletId?: string) {
     });
 
     socketInstance.on('disconnect', (reason) => {
-      console.log('Disconnected from socket server. Reason:', reason);
+      console.log('Socket disconnected. Reason:', reason);
+      console.log('Socket connected status:', socketInstance.connected);
       setIsConnected(false);
       clearHeartbeat();
 
@@ -74,25 +79,27 @@ export function useSocket(outletId?: string) {
 
     socketInstance.on('connect_error', (error) => {
       console.error('Socket connection error:', error);
+      console.log('Socket connected status:', socketInstance.connected);
       setIsConnected(false);
       clearHeartbeat();
       attemptReconnection();
     });
 
     socketInstance.on('reconnect', (attemptNumber) => {
-      console.log('Reconnected after', attemptNumber, 'attempts');
+      console.log('Socket reconnected after', attemptNumber, 'attempts');
+      console.log('Socket connected status:', socketInstance.connected);
       setIsConnected(true);
       reconnectAttemptsRef.current = 0;
       setupHeartbeat();
     });
 
     socketInstance.on('reconnect_error', (error) => {
-      console.error('Reconnection error:', error);
+      console.error('Socket reconnection error:', error);
       setIsConnected(false);
     });
 
     socketInstance.on('reconnect_failed', () => {
-      console.error('Failed to reconnect after maximum attempts');
+      console.error('Socket failed to reconnect after maximum attempts');
       setIsConnected(false);
       clearHeartbeat();
     });
@@ -104,6 +111,12 @@ export function useSocket(outletId?: string) {
 
     socketInstance.on('joined-order-room', (data) => {
       console.log('Successfully joined order room:', data);
+    });
+
+    // Handle connection confirmation
+    socketInstance.on('connection-confirmed', (data) => {
+      console.log('Connection confirmed from server:', data);
+      setIsConnected(true); // Ensure we set connected state
     });
 
     // Handle heartbeat response
@@ -133,15 +146,30 @@ export function useSocket(outletId?: string) {
       
       reconnectTimeoutRef.current = setTimeout(() => {
         if (!socketInstance.connected) {
+          console.log('Manually triggering reconnection...');
           socketInstance.connect();
         }
       }, delay);
     };
 
+    // Force connection check after a short delay
+    setTimeout(() => {
+      console.log('Checking socket connection status after initialization...');
+      console.log('Socket connected:', socketInstance.connected);
+      console.log('Socket ID:', socketInstance.id);
+      
+      if (socketInstance.connected) {
+        setIsConnected(true);
+      } else {
+        console.log('Socket not connected, attempting manual connection...');
+        socketInstance.connect();
+      }
+    }, 1000);
+
     setSocket(socketInstance);
 
     return () => {
-      console.log('Cleaning up socket connection');
+      console.log('Cleaning up socket connection for outlet:', outletId);
       clearHeartbeat();
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
