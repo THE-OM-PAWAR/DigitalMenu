@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
+import { Separator } from '@/components/ui/separator';
 import { 
   Store, Search, Leaf, Beef, MapPin, Phone, 
   ChefHat, Utensils, Star, Clock, Grid3X3
@@ -182,23 +183,23 @@ export default function PublicMenuPage() {
       <div className="min-h-screen" style={{ backgroundColor: 'var(--theme-background)', color: 'var(--theme-text)' }}>
         {/* Header */}
         <div className="sticky top-0 z-50" style={{ backgroundColor: 'var(--theme-background)', borderBottomColor: 'var(--theme-border)' }}>
-          <div className="px-3 py-3 border-b">
+          <div className="px-4 py-4 border-b">
             <div className="flex items-center justify-between">
               {/* Left - Outlet Logo */}
-              <div className="flex items-center space-x-2">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)' }}>
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)' }}>
                   {outlet.logo ? (
                     <img 
                       src={outlet.logo} 
                       alt={outlet.name}
-                      className="w-8 h-8 rounded object-cover"
+                      className="w-10 h-10 rounded-lg object-cover"
                     />
                   ) : (
-                    <Store className="h-5 w-5" style={{ color: 'var(--theme-background)' }} />
+                    <Store className="h-6 w-6" style={{ color: 'var(--theme-background)' }} />
                   )}
                 </div>
                 <div>
-                  <h1 className="text-base font-bold" style={{ fontFamily: 'var(--theme-font-heading)', color: 'var(--theme-text)' }}>
+                  <h1 className="text-lg font-bold" style={{ fontFamily: 'var(--theme-font-heading)', color: 'var(--theme-text)' }}>
                     {outlet.name}
                   </h1>
                   <div className="flex items-center text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
@@ -211,9 +212,9 @@ export default function PublicMenuPage() {
               {/* Right - Location Button */}
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center space-x-1 text-xs px-2 py-1" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}>
-                    <MapPin className="h-3 w-3" />
-                    <span className="hidden sm:inline">Info</span>
+                  <Button variant="outline" size="sm" className="flex items-center space-x-1" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}>
+                    <MapPin className="h-4 w-4" />
+                    <span className="hidden sm:inline">Location</span>
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-80" style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}>
@@ -256,42 +257,47 @@ export default function PublicMenuPage() {
           </div>
         </div>
 
-        <div className="px-3 pb-6">
+        <div className="px-4 pb-8">
           {/* Popular Items Section */}
           {highlightedItems.length > 0 && (
-            <div className="py-3">
-              <div className="flex items-center space-x-2 mb-2">
-                <Star className="h-4 w-4" style={{ color: 'var(--theme-accent)' }} />
-                <h2 className="text-base font-semibold" style={{ fontFamily: 'var(--theme-font-heading)', color: 'var(--theme-text)' }}>
+            <div className="py-4">
+              <div className="flex items-center space-x-2 mb-3">
+                <Star className="h-5 w-5" style={{ color: 'var(--theme-accent)' }} />
+                <h2 className="text-lg font-semibold" style={{ fontFamily: 'var(--theme-font-heading)', color: 'var(--theme-text)' }}>
                   Popular Items
                 </h2>
               </div>
-              <div className="flex space-x-2 overflow-x-auto pb-2">
+              <div className="flex space-x-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <style jsx>{`
+                  div::-webkit-scrollbar {
+                    display: none;
+                  }
+                `}</style>
                 {highlightedItems.map((item) => (
                   <Drawer key={item._id}>
                     <DrawerTrigger asChild>
-                      <div className="flex-shrink-0 w-24 cursor-pointer">
+                      <div className="flex-shrink-0 w-32 cursor-pointer">
                         <div className="relative">
                           {item.image ? (
                             <img 
                               src={item.image} 
                               alt={item.name}
-                              className="w-full h-16 object-cover rounded-lg"
+                              className="w-full h-20 object-cover rounded-lg"
                             />
                           ) : (
-                            <div className="w-full h-16 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-surface)' }}>
-                              <Utensils className="h-5 w-5" style={{ color: 'var(--theme-text-secondary)' }} />
+                            <div className="w-full h-20 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-surface)' }}>
+                              <Utensils className="h-6 w-6" style={{ color: 'var(--theme-text-secondary)' }} />
                             </div>
                           )}
                           <div className="absolute top-1 left-1">
                             <div 
-                              className="w-3 h-3 rounded-full border flex items-center justify-center"
+                              className="w-4 h-4 rounded-full border flex items-center justify-center"
                               style={{
                                 backgroundColor: item.isVeg ? 'var(--theme-veg)' : 'var(--theme-non-veg)',
                                 borderColor: item.isVeg ? 'var(--theme-veg)' : 'var(--theme-non-veg)',
                               }}
                             >
-                              <div className="w-1 h-1 rounded-full bg-white" />
+                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
                             </div>
                           </div>
                           <div className="absolute top-1 right-1">
@@ -324,40 +330,31 @@ export default function PublicMenuPage() {
                           </div>
                         )}
                         <div className="space-y-3">
-                          <div className="flex items-center space-x-2 mb-3">
+                          <div className="flex items-center space-x-2 mb-4">
+                            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-accent)' }}>
+                              <span className="text-xs font-bold text-white">₹</span>
+                            </div>
+                            <h4 className="font-semibold text-lg" style={{ color: 'var(--theme-text)' }}>Pricing Options</h4>
+                          </div>
+                          {item.quantityPrices.map((qp, index) => (
                             <div 
-                              className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                              style={{
-                                backgroundColor: item.isVeg ? 'var(--theme-veg)' : 'var(--theme-non-veg)',
-                                borderColor: item.isVeg ? 'var(--theme-veg)' : 'var(--theme-non-veg)',
+                              key={index} 
+                              className="flex justify-between items-center py-4 px-4 rounded-lg border-2"
+                              style={{ 
+                                backgroundColor: 'var(--theme-background)',
+                                borderColor: 'var(--theme-accent)',
+                                borderStyle: 'solid'
                               }}
                             >
-                              <div className="w-2 h-2 rounded-full bg-white" />
+                              <div>
+                                <span className="font-semibold text-lg" style={{ color: 'var(--theme-text)' }}>{qp.quantityId.value}</span>
+                                <span className="text-sm ml-2 block" style={{ color: 'var(--theme-text-secondary)' }}>({qp.quantityId.description})</span>
+                              </div>
+                              <span className="text-xl font-bold" style={{ color: 'var(--theme-accent)' }}>
+                                ₹{qp.price.toFixed(2)}
+                              </span>
                             </div>
-                            <span className="text-sm font-medium" style={{ color: 'var(--theme-text)' }}>
-                              {item.isVeg ? 'Vegetarian' : 'Non-Vegetarian'}
-                            </span>
-                          </div>
-                          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-3 rounded-lg border border-yellow-200">
-                            <h4 className="font-semibold text-sm mb-2" style={{ color: 'var(--theme-text)' }}>💰 Pricing Options</h4>
-                            <div className="space-y-2">
-                              {item.quantityPrices.map((qp, index) => (
-                                <div 
-                                  key={index} 
-                                  className="flex justify-between items-center py-2 px-3 rounded-md"
-                                  style={{ backgroundColor: 'var(--theme-background)' }}
-                                >
-                                  <div>
-                                    <span className="font-medium text-sm" style={{ color: 'var(--theme-text)' }}>{qp.quantityId.value}</span>
-                                    <span className="text-xs ml-2" style={{ color: 'var(--theme-text-secondary)' }}>({qp.quantityId.description})</span>
-                                  </div>
-                                  <span className="text-lg font-bold" style={{ color: 'var(--theme-accent)' }}>
-                                    ₹{qp.price.toFixed(2)}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                          ))}
                         </div>
                       </div>
                     </DrawerContent>
@@ -367,75 +364,98 @@ export default function PublicMenuPage() {
             </div>
           )}
 
-          {/* Categories Section */}
+          {/* Categories Section - Horizontal Scroll with 4 items visible */}
           {categories.length > 0 && (
-            <div className="py-3">
-              <div className="flex items-center space-x-2 mb-2">
-                <Grid3X3 className="h-4 w-4" style={{ color: 'var(--theme-accent)' }} />
-                <h2 className="text-base font-semibold" style={{ fontFamily: 'var(--theme-font-heading)', color: 'var(--theme-text)' }}>
+            <div className="py-4">
+              <div className="flex items-center space-x-2 mb-4">
+                <Grid3X3 className="h-5 w-5" style={{ color: 'var(--theme-accent)' }} />
+                <h2 className="text-lg font-semibold" style={{ fontFamily: 'var(--theme-font-heading)', color: 'var(--theme-text)' }}>
                   Categories
                 </h2>
               </div>
-              <div className="flex space-x-2 overflow-x-auto pb-2">
+              
+              {/* Horizontal scrollable categories */}
+              <div className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <style jsx>{`
+                  div::-webkit-scrollbar {
+                    display: none;
+                  }
+                `}</style>
+                
                 {/* All Categories Button */}
-                <button
+                <div
                   onClick={() => setSelectedCategory('all')}
-                  className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                    selectedCategory === 'all' ? 'ring-2' : ''
+                  className={`flex-shrink-0 w-28 h-28 cursor-pointer rounded-2xl relative overflow-hidden snap-start transition-all ${
+                    selectedCategory === 'all' ? '' : ''
                   }`}
                   style={{ 
-                    backgroundColor: selectedCategory === 'all' ? 'var(--theme-primary)' : 'var(--theme-surface)',
-                    color: selectedCategory === 'all' ? 'var(--theme-background)' : 'var(--theme-text)',
-                    borderColor: selectedCategory === 'all' ? 'var(--theme-primary)' : 'transparent'
+                    backgroundColor: 'var(--theme-surface)',
+                    borderColor: selectedCategory === 'all' ? 'var(--theme-primary)' : 'transparent',
+                    borderWidth: selectedCategory === 'all' ? 2 : 0,
+                    borderStyle: 'solid'
                   }}
                 >
-                  All Items
-                </button>
-                {categories.map((category) => (
-                  <button
-                    key={category._id}
-                    onClick={() => setSelectedCategory(category._id)}
-                    className={`flex-shrink-0 flex items-center space-x-2 px-3 py-2 rounded-lg transition-all ${
-                      selectedCategory === category._id ? 'ring-2' : ''
-                    }`}
-                    style={{ 
-                      backgroundColor: selectedCategory === category._id ? 'var(--theme-primary)' : 'var(--theme-surface)',
-                      color: selectedCategory === category._id ? 'var(--theme-background)' : 'var(--theme-text)',
-                      borderColor: selectedCategory === category._id ? 'var(--theme-primary)' : 'transparent'
-                    }}
-                  >
-                    {category.image ? (
-                      <img 
-                        src={category.image} 
-                        alt={category.name}
-                        className="w-5 h-5 rounded object-cover"
-                      />
-                    ) : (
-                      <ChefHat className="h-4 w-4" />
-                    )}
-                    <div className="text-left">
-                      <p className="font-medium text-xs truncate">
-                        {category.name}
-                      </p>
-                      <p className="text-xs opacity-75">
-                        {filteredItems.filter(item => item.categoryId._id === category._id).length} items
-                      </p>
+                  <div className="absolute inset-0 bg-gradient-to-br from-gray-400 to-gray-600"></div>
+                  <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+                    <Grid3X3 className="h-8 w-8 mb-2" />
+                    <span className="text-sm font-semibold text-center leading-tight">All</span>
+                    <span className="text-sm opacity-90">{items.length}</span>
+                  </div>
+                </div>
+                
+                {categories.map((category) => {
+                  const categoryItemCount = items.filter(item => item.categoryId._id === category._id).length;
+                  return (
+                    <div
+                      key={category._id}
+                      onClick={() => setSelectedCategory(category._id)}
+                      className={`flex-shrink-0 w-28 h-28 cursor-pointer rounded-2xl relative overflow-hidden snap-start transition-all ${
+                        selectedCategory === category._id ? '' : ''
+                      }`}
+                      style={{ 
+                        borderColor: selectedCategory === category._id ? 'var(--theme-primary)' : 'transparent',
+                        borderWidth: selectedCategory === category._id ? 2 : 0,
+                        borderStyle: 'solid'
+                      }}
+                    >
+                      {/* Background Image */}
+                      {category.image ? (
+                        <img 
+                          src={category.image} 
+                          alt={category.name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-orange-400 to-red-500"></div>
+                      )}
+                      
+                      {/* Dark Overlay */}
+                      <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+                      
+                      {/* Text Overlay */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-2">
+                        <span className="text-sm font-semibold text-center leading-tight mb-1">
+                          {category.name}
+                        </span>
+
+                      </div>
                     </div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
 
           {/* Search */}
-          <div className="py-3">
+          <div className="py-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4" style={{ color: 'var(--theme-text-secondary)' }} />
               <Input
                 placeholder="Search for dishes..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 py-2 text-sm"
+                className="pl-10"
                 style={{ 
                   borderColor: 'var(--theme-border)',
                   backgroundColor: 'var(--theme-surface)',
@@ -447,154 +467,148 @@ export default function PublicMenuPage() {
 
           {/* Menu Items by Category */}
           {Object.keys(groupedItems).length > 0 ? (
-            <div className="space-y-4">
-              {Object.values(groupedItems).map(({ category, items }) => (
+            <div className="space-y-6">
+              {Object.values(groupedItems).map(({ category, items }, idx) => (
                 <section key={category._id}>
-                  {/* Category Header */}
-                  <div className="flex items-center justify-between mb-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-surface)' }}>
-                    <div className="flex items-center space-x-2">
-                      {category.image ? (
-                        <img 
-                          src={category.image} 
-                          alt={category.name}
-                          className="w-6 h-6 rounded object-cover"
-                        />
-                      ) : (
+                  {/* Category Header - Enhanced */}
+                  <div
+                    className={`flex items-center justify-between mb-4 p-4 rounded-xl ${idx === 0 ? 'mt-2' : 'mt-16'}`}
+                    style={{ backgroundColor: 'var(--theme-accent)', color: 'var(--theme-background)' }}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-background)' }}>
                         <ChefHat className="h-5 w-5" style={{ color: 'var(--theme-accent)' }} />
-                      )}
-                      <h3 className="text-lg font-bold" style={{ fontFamily: 'var(--theme-font-heading)', color: 'var(--theme-text)' }}>
+                      </div>
+                      <h3 className="text-xl font-bold" style={{ fontFamily: 'var(--theme-font-heading)' }}>
                         {category.name}
                       </h3>
                     </div>
-                    <Badge variant="secondary" className="text-xs" style={{ backgroundColor: 'var(--theme-accent)', color: 'var(--theme-background)' }}>
+                    <Badge variant="secondary" style={{ backgroundColor: 'var(--theme-background)', color: 'var(--theme-accent)' }}>
                       {items.length} items
                     </Badge>
                   </div>
 
-                  {/* Items List */}
-                  <div className="space-y-2">
-                    {items.map((item) => (
-                      <Drawer key={item._id}>
-                        <DrawerTrigger asChild>
-                          <div className="flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-all hover:shadow-sm" style={{ backgroundColor: 'var(--theme-surface)' }}>
-                            {/* Item Image */}
-                            <div className="relative flex-shrink-0">
-                              {item.image ? (
-                                <img 
-                                  src={item.image} 
-                                  alt={item.name}
-                                  className="w-14 h-14 object-cover rounded-lg"
-                                />
-                              ) : (
-                                <div className="w-14 h-14 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-background)' }}>
-                                  <Utensils className="h-5 w-5" style={{ color: 'var(--theme-text-secondary)' }} />
-                                </div>
-                              )}
-                              <div className="absolute -top-1 -left-1">
-                                <div 
-                                  className="w-4 h-4 rounded-full border-2 flex items-center justify-center"
-                                  style={{
-                                    backgroundColor: item.isVeg ? 'var(--theme-veg)' : 'var(--theme-non-veg)',
-                                    borderColor: item.isVeg ? 'var(--theme-veg)' : 'var(--theme-non-veg)',
-                                  }}
-                                >
-                                  <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                  {/* Items List - Optimized */}
+                  <div className="space-y-0 rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--theme-surface)' }}>
+                    {items.map((item, index) => (
+                      <div key={item._id}>
+                        <Drawer>
+                          <DrawerTrigger asChild>
+                            <div className="flex items-center space-x-3 p-3 cursor-pointer transition-all hover:opacity-80" style={{ backgroundColor: 'var(--theme-surface)' }}>
+                              {/* Item Image */}
+                              <div className="relative flex-shrink-0">
+                                {item.image ? (
+                                  <img 
+                                    src={item.image} 
+                                    alt={item.name}
+                                    className="w-12 h-12 object-cover rounded-lg"
+                                  />
+                                ) : (
+                                  <div className="w-16 h-16 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-background)' }}>
+                                    <Utensils className="h-6 w-6" style={{ color: 'var(--theme-text-secondary)' }} />
+                                  </div>
+                                )}
+                                <div className="absolute -top-1 -left-1">
+                                  <div 
+                                    className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                                    style={{
+                                      backgroundColor: item.isVeg ? 'var(--theme-veg)' : 'var(--theme-non-veg)',
+                                      borderColor: item.isVeg ? 'var(--theme-veg)' : 'var(--theme-non-veg)',
+                                    }}
+                                  >
+                                    <div className="w-2 h-2 rounded-full bg-white" />
+                                  </div>
                                 </div>
                               </div>
-                            </div>
 
-                            {/* Item Info */}
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-sm truncate" style={{ color: 'var(--theme-text)' }}>
-                                {item.name}
-                              </h4>
-                              <p className="text-xs line-clamp-2 mt-1" style={{ color: 'var(--theme-text-secondary)' }}>
-                                {item.description}
-                              </p>
-                            </div>
+                              {/* Item Info */}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-base truncate" style={{ color: 'var(--theme-text)' }}>
+                                  {item.name}
+                                </h4>
+                                {/* <p className="text-sm " style={{ color: 'var(--theme-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {item.description}
+                                </p> */}
+                              </div>
 
-                            {/* Price */}
-                            <div className="flex-shrink-0 text-right">
-                              <p className="font-bold text-sm" style={{ color: 'var(--theme-accent)' }}>
-                                ₹{item.quantityPrices[0]?.price.toFixed(0)}
-                              </p>
-                              {item.quantityPrices.length > 1 && (
-                                <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
-                                  +{item.quantityPrices.length - 1} more
+                              {/* Price */}
+                              <div className="flex-shrink-0 text-right">
+                                <p className="font-bold text-lg" style={{ color: 'var(--theme-accent)' }}>
+                                  ₹{item.quantityPrices[0]?.price.toFixed(0)}
                                 </p>
+                                {item.quantityPrices.length > 1 && (
+                                  <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
+                                    +{item.quantityPrices.length - 1} more
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </DrawerTrigger>
+                          <DrawerContent style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}>
+                            <DrawerHeader>
+                              <DrawerTitle style={{ color: 'var(--theme-text)' }}>{item.name}</DrawerTitle>
+                              <DrawerDescription style={{ color: 'var(--theme-text-secondary)' }}>
+                                {item.description}
+                              </DrawerDescription>
+                            </DrawerHeader>
+                            <div className="px-4 pb-6">
+                              {item.image && (
+                                <div className="w-full h-64 mb-4 rounded-lg overflow-hidden">
+                                  <img 
+                                    src={item.image} 
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
                               )}
-                            </div>
-                          </div>
-                        </DrawerTrigger>
-                        <DrawerContent style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}>
-                          <DrawerHeader>
-                            <DrawerTitle style={{ color: 'var(--theme-text)' }}>{item.name}</DrawerTitle>
-                            <DrawerDescription style={{ color: 'var(--theme-text-secondary)' }}>
-                              {item.description}
-                            </DrawerDescription>
-                          </DrawerHeader>
-                          <div className="px-4 pb-6">
-                            {item.image && (
-                              <div className="w-full h-64 mb-4 rounded-lg overflow-hidden">
-                                <img 
-                                  src={item.image} 
-                                  alt={item.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                            <div className="space-y-3">
-                              <div className="flex items-center space-x-2 mb-3">
-                                <div 
-                                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                                  style={{
-                                    backgroundColor: item.isVeg ? 'var(--theme-veg)' : 'var(--theme-non-veg)',
-                                    borderColor: item.isVeg ? 'var(--theme-veg)' : 'var(--theme-non-veg)',
-                                  }}
-                                >
-                                  <div className="w-2 h-2 rounded-full bg-white" />
+                              <div className="space-y-3">
+                                <div className="flex items-center space-x-2 mb-4">
+                                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-accent)' }}>
+                                    <span className="text-xs font-bold text-white">₹</span>
+                                  </div>
+                                  <h4 className="font-semibold text-lg" style={{ color: 'var(--theme-text)' }}>Pricing Options</h4>
                                 </div>
-                                <span className="text-sm font-medium" style={{ color: 'var(--theme-text)' }}>
-                                  {item.isVeg ? 'Vegetarian' : 'Non-Vegetarian'}
-                                </span>
-                              </div>
-                              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
-                                <h4 className="font-semibold text-base mb-3" style={{ color: 'var(--theme-text)' }}>💰 Pricing Options</h4>
-                                <div className="space-y-2">
-                                  {item.quantityPrices.map((qp, index) => (
-                                    <div 
-                                      key={index} 
-                                      className="flex justify-between items-center py-3 px-4 rounded-lg shadow-sm"
-                                      style={{ backgroundColor: 'var(--theme-background)' }}
-                                    >
-                                      <div>
-                                        <span className="font-semibold text-base" style={{ color: 'var(--theme-text)' }}>{qp.quantityId.value}</span>
-                                        <span className="text-sm ml-2" style={{ color: 'var(--theme-text-secondary)' }}>({qp.quantityId.description})</span>
-                                      </div>
-                                      <span className="text-xl font-bold" style={{ color: 'var(--theme-accent)' }}>
-                                        ₹{qp.price.toFixed(2)}
-                                      </span>
+                                {item.quantityPrices.map((qp, index) => (
+                                  <div 
+                                    key={index} 
+                                    className="flex justify-between items-center py-4 px-4 rounded-lg border-2"
+                                    style={{ 
+                                      backgroundColor: 'var(--theme-background)',
+                                      borderColor: 'var(--theme-accent)',
+                                      borderStyle: 'solid'
+                                    }}
+                                  >
+                                    <div>
+                                      <span className="font-semibold text-lg" style={{ color: 'var(--theme-text)' }}>{qp.quantityId.value}</span>
+                                      <span className="text-sm ml-2 block" style={{ color: 'var(--theme-text-secondary)' }}>({qp.quantityId.description})</span>
                                     </div>
-                                  ))}
-                                </div>
+                                    <span className="text-xl font-bold" style={{ color: 'var(--theme-accent)' }}>
+                                      ₹{qp.price.toFixed(2)}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
                             </div>
-                          </div>
-                        </DrawerContent>
-                      </Drawer>
+                          </DrawerContent>
+                        </Drawer>
+                        {/* Separator between items */}
+                        {index < items.length - 1 && (
+                          <Separator style={{ backgroundColor: 'var(--theme-border)' }} />
+                        )}
+                      </div>
                     ))}
                   </div>
                 </section>
               ))}
             </div>
           ) : (
-            <div className="text-center py-12">
+            <div className="text-center py-16">
               <div className="max-w-md mx-auto">
                 {searchQuery || selectedCategory !== 'all' ? (
                   <>
-                    <Search className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--theme-text-secondary)' }} />
-                    <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--theme-text)' }}>No items found</h3>
-                    <p className="mb-4 text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
+                    <Search className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--theme-text-secondary)' }} />
+                    <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--theme-text)' }}>No items found</h3>
+                    <p className="mb-6" style={{ color: 'var(--theme-text-secondary)' }}>
                       Try adjusting your search or selecting a different category.
                     </p>
                     <Button
@@ -609,9 +623,9 @@ export default function PublicMenuPage() {
                   </>
                 ) : (
                   <>
-                    <Utensils className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--theme-text-secondary)' }} />
-                    <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--theme-text)' }}>Menu Coming Soon</h3>
-                    <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
+                    <Utensils className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--theme-text-secondary)' }} />
+                    <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--theme-text)' }}>Menu Coming Soon</h3>
+                    <p style={{ color: 'var(--theme-text-secondary)' }}>
                       We're working on adding delicious items to our menu. Please check back later!
                     </p>
                   </>
@@ -622,14 +636,14 @@ export default function PublicMenuPage() {
         </div>
 
         {/* Footer */}
-        <footer className="border-t mt-6" style={{ backgroundColor: 'var(--theme-surface)', borderTopColor: 'var(--theme-border)' }}>
-          <div className="px-3 py-4">
+        <footer className="border-t mt-8" style={{ backgroundColor: 'var(--theme-surface)', borderTopColor: 'var(--theme-border)' }}>
+          <div className="px-4 py-6">
             <div className="text-center">
               <div className="flex items-center justify-center space-x-2 mb-2">
-                <div className="w-5 h-5 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)' }}>
-                  <Store className="h-3 w-3" style={{ color: 'var(--theme-background)' }} />
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--theme-primary)' }}>
+                  <Store className="h-4 w-4" style={{ color: 'var(--theme-background)' }} />
                 </div>
-                <span className="font-semibold text-sm" style={{ color: 'var(--theme-text)' }}>{outlet.name}</span>
+                <span className="font-semibold" style={{ color: 'var(--theme-text)' }}>{outlet.name}</span>
               </div>
               <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
                 Powered by MenuMaster
