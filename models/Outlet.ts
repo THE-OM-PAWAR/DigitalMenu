@@ -7,6 +7,7 @@ export interface IOutlet extends Document {
   address?: string;
   phone?: string;
   theme?: string;
+  orderManagementEnabled?: boolean;
   createdBy: mongoose.Types.ObjectId;
   adminUserId: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -43,6 +44,10 @@ const OutletSchema = new Schema<IOutlet>({
     type: String,
     default: 'modern',
     enum: ['modern', 'premium', 'traditional', 'vibrant', 'minimalist', 'dark'],
+  },
+  orderManagementEnabled: {
+    type: Boolean,
+    default: false,
   },
   createdBy: {
     type: Schema.Types.ObjectId,

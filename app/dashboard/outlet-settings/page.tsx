@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Building, ArrowLeft, Loader2, Save, Upload, Store } from 'lucide-react';
+import { Building, ArrowLeft, Loader2, Save, Upload, Store, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardHeader from '@/components/DashboardHeader';
 import axios from 'axios';
@@ -22,6 +23,7 @@ interface Outlet {
   address?: string;
   phone?: string;
   createdAt: string;
+  orderManagementEnabled?: boolean;
 }
 
 export default function OutletSettingsPage() {
@@ -30,6 +32,7 @@ export default function OutletSettingsPage() {
   const [outlet, setOutlet] = useState<Outlet | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [orderManagementEnabled, setOrderManagementEnabled] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     logo: '',
@@ -53,8 +56,12 @@ export default function OutletSettingsPage() {
 
   const fetchOutlet = async () => {
     try {
-      const response = await axios.get('/api/outlets');
-      const outletData = response.data.outlet;
+      const [outletResponse, settingsResponse] = await Promise.all([
+        axios.get('/api/outlets'),
+        axios.get('/api/outlets/settings').catch(() => ({ data: { orderManagementEnabled: false } }))
+      ]);
+      
+      const outletData = outletResponse.data.outlet;
       
       if (!outletData) {
         router.push('/dashboard');
@@ -62,6 +69,7 @@ export default function OutletSettingsPage() {
       }
 
       setOutlet(outletData);
+      setOrderManagementEnabled(settingsResponse.data.orderManagementEnabled || false);
       setFormData({
         name: outletData.name || '',
         logo: outletData.logo || '',
@@ -82,6 +90,17 @@ export default function OutletSettingsPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleOrderManagementToggle = async (enabled: boolean) => {
+    try {
+      await axios.put(`/api/outlets/${outlet?._id}/settings`, {
+        orderManagementEnabled: enabled
+      });
+      setOrderManagementEnabled(enabled);
+    } catch (error) {
+      console.error('Error updating order management setting:', error);
     }
   };
 
@@ -125,9 +144,9 @@ export default function OutletSettingsPage() {
 
   if (loading || isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <Loader2 className="h-8 w-8 animate-spin text-gray-900 mx-auto mb-4" />
           <p className="text-gray-600">Loading outlet settings...</p>
         </div>
       </div>
@@ -139,7 +158,7 @@ export default function OutletSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50">
+    <div className="min-h-screen bg-gray-50">
       <DashboardHeader outlet={outlet} onSignOut={handleSignOut} />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -152,15 +171,15 @@ export default function OutletSettingsPage() {
             </Button>
           </Link>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Outlet Settings</h1>
-          <p className="text-gray-600">Manage your outlet information and branding</p>
+          <p className="text-gray-600">Manage your outlet information and features</p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Outlet Overview */}
           <div className="lg:col-span-1">
-            <Card>
+            <Card className="border-0 shadow-sm">
               <CardHeader className="text-center">
-                <div className="w-24 h-24 mx-auto mb-4 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-lg flex items-center justify-center">
+                <div className="w-24 h-24 mx-auto mb-4 bg-gray-900 rounded-lg flex items-center justify-center">
                   {outlet.logo ? (
                     <img 
                       src={outlet.logo} 
@@ -199,8 +218,63 @@ export default function OutletSettingsPage() {
           </div>
 
           {/* Settings Form */}
-          <div className="lg:col-span-2">
-            <Card>
+          <div className="lg:col-span-2 space-y-6">
+            {/* Order Management Settings */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <ShoppingCart className="h-5 w-5 mr-2" />
+                  Order Management
+                </CardTitle>
+                <CardDescription>
+                  Enable real-time order management for your outlet
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="order-management">Enable Order Management</Label>
+                    <p className="text-sm text-gray-600">
+                      Allow customers to place orders through your digital menu
+                    </p>
+                  </div>
+                  <Switch
+                    id="order-management"
+                    checked={orderManagementEnabled}
+                    onCheckedChange={handleOrderManagementToggle}
+                  />
+                </div>
+                
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <div className={`w-3 h-3 rounded-full ${orderManagementEnabled ? 'bg-green-500' : 'bg-gray-400'}`} />
+                    <span className="font-medium">
+                      Status: {orderManagementEnabled ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {orderManagementEnabled 
+                      ? 'Customers can now place orders through your menu. You can manage orders from the Orders page.'
+                      : 'Order management is disabled. Customers can view your menu but cannot place orders.'
+                    }
+                  </p>
+                </div>
+
+                {orderManagementEnabled && (
+                  <div className="pt-4">
+                    <Link href="/dashboard/orders">
+                      <Button className="w-full bg-orange-600 hover:bg-orange-700">
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Manage Orders
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Outlet Information */}
+            <Card className="border-0 shadow-sm">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>

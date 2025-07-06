@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Store, Plus, Menu, Users, QrCode, TrendingUp, Loader2, ArrowRight, ExternalLink } from 'lucide-react';
+import { Store, Plus, Menu, Users, QrCode, TrendingUp, Loader2, ArrowRight, ExternalLink, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardHeader from '@/components/DashboardHeader';
 import axios from 'axios';
@@ -20,6 +20,7 @@ interface Outlet {
   logo?: string;
   description?: string;
   createdAt: string;
+  orderManagementEnabled?: boolean;
 }
 
 export default function DashboardPage() {
@@ -148,23 +149,25 @@ export default function DashboardPage() {
 
               <Card className="border-0 shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Orders Today</CardTitle>
+                  <ShoppingCart className="h-4 w-4 text-gray-400" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-gray-900">0</div>
+                  <p className="text-xs text-gray-500">
+                    {outlet.orderManagementEnabled ? 'Ready to receive orders' : 'Enable order management'}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-gray-600">QR Scans</CardTitle>
                   <QrCode className="h-4 w-4 text-gray-400" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-gray-900">0</div>
                   <p className="text-xs text-gray-500">This month</p>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-600">Team</CardTitle>
-                  <Users className="h-4 w-4 text-gray-400" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-gray-900">1</div>
-                  <p className="text-xs text-gray-500">You (Admin)</p>
                 </CardContent>
               </Card>
 
@@ -204,6 +207,60 @@ export default function DashboardPage() {
 
               <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
                 <CardHeader>
+                  <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-orange-200 transition-colors">
+                    <ShoppingCart className="h-6 w-6 text-orange-600" />
+                  </div>
+                  <CardTitle className="text-lg">Order Management</CardTitle>
+                  <CardDescription className="text-gray-600">
+                    {outlet.orderManagementEnabled 
+                      ? 'Manage incoming orders and track status'
+                      : 'Enable real-time order management'
+                    }
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {outlet.orderManagementEnabled ? (
+                    <Link href="/dashboard/orders">
+                      <Button className="w-full bg-orange-600 hover:bg-orange-700">
+                        View Orders
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link href="/dashboard/outlet-settings">
+                      <Button variant="outline" className="w-full border-orange-300 text-orange-600 hover:bg-orange-50">
+                        Enable Orders
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </Link>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
+                <CardHeader>
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-200 transition-colors">
+                    <ExternalLink className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <CardTitle className="text-lg">View Public Menu</CardTitle>
+                  <CardDescription className="text-gray-600">
+                    See how your menu looks to customers
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-blue-300 text-blue-600 hover:bg-blue-50"
+                    onClick={() => window.open(`/menu/${outlet._id}`, '_blank')}
+                  >
+                    Open Menu
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
+                <CardHeader>
                   <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-gray-200 transition-colors">
                     <QrCode className="h-6 w-6 text-gray-700" />
                   </div>
@@ -215,28 +272,6 @@ export default function DashboardPage() {
                 <CardContent>
                   <Button variant="outline" className="w-full border-gray-300 hover:bg-gray-50">
                     Generate QR
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
-                <CardHeader>
-                  <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-orange-200 transition-colors">
-                    <ExternalLink className="h-6 w-6 text-orange-600" />
-                  </div>
-                  <CardTitle className="text-lg">View Public Menu</CardTitle>
-                  <CardDescription className="text-gray-600">
-                    See how your menu looks to customers
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-orange-300 text-orange-600 hover:bg-orange-50"
-                    onClick={() => window.open(`/menu/${outlet._id}`, '_blank')}
-                  >
-                    Open Menu
-                    <ExternalLink className="ml-2 h-4 w-4" />
                   </Button>
                 </CardContent>
               </Card>

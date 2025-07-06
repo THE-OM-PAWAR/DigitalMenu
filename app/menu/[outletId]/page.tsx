@@ -11,9 +11,11 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, Dr
 import { Separator } from '@/components/ui/separator';
 import { 
   Store, Search, Leaf, Beef, MapPin, Phone, 
-  ChefHat, Utensils, Star, Clock, Grid3X3
+  ChefHat, Utensils, Star, Clock, Grid3X3, Plus, Minus, ShoppingCart
 } from 'lucide-react';
 import ThemeProvider from '@/components/ThemeProvider';
+import OrderCart from '@/components/OrderCart';
+import { OrderItem } from '@/lib/orderTypes';
 import axios from 'axios';
 
 interface Outlet {
@@ -24,6 +26,7 @@ interface Outlet {
   address?: string;
   phone?: string;
   theme?: string;
+  orderManagementEnabled?: boolean;
 }
 
 interface Category {
@@ -55,12 +58,13 @@ interface Item {
 
 export default function PublicMenuPage() {
   const params = useParams();
-  const outletId = params.outletId as string;
-  
+  const outletId = params?.outletId as string;
+
   const [outlet, setOutlet] = useState<Outlet | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [highlightedItems, setHighlightedItems] = useState<Item[]>([]);
+  const [cartItems, setCartItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -72,6 +76,27 @@ export default function PublicMenuPage() {
       fetchMenuData();
     }
   }, [outletId]);
+
+  // Load cart from localStorage on component mount
+  useEffect(() => {
+    const savedCart = localStorage.getItem(`cart-${outletId}`);
+    if (savedCart) {
+      try {
+        const parsedCart = JSON.parse(savedCart);
+        setCartItems(parsedCart);
+      } catch (error) {
+        console.error('Error parsing saved cart:', error);
+        localStorage.removeItem(`cart-${outletId}`);
+      }
+    }
+  }, [outletId]);
+
+  // Save cart to localStorage whenever cartItems changes
+  useEffect(() => {
+    if (outletId) {
+      localStorage.setItem(`cart-${outletId}`, JSON.stringify(cartItems));
+    }
+  }, [cartItems, outletId]);
 
   const fetchMenuData = async () => {
     try {
@@ -115,6 +140,48 @@ export default function PublicMenuPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const addToCart = (item: Item, quantityPrice: { quantityId: { _id: string; value: string; description: string }; price: number }) => {
+    const cartItemId = `${item._id}-${quantityPrice.quantityId._id}`;
+    
+    setCartItems(prev => {
+      const existingItem = prev.find(cartItem => cartItem.id === cartItemId);
+      
+      if (existingItem) {
+        return prev.map(cartItem =>
+          cartItem.id === cartItemId
+            ? { ...cartItem, quantity: cartItem.quantity + 1 }
+            : cartItem
+        );
+      } else {
+        const newItem: OrderItem = {
+          id: cartItemId,
+          name: item.name,
+          quantity: 1,
+          price: quantityPrice.price,
+          quantityId: quantityPrice.quantityId._id,
+          quantityDescription: quantityPrice.quantityId.description,
+        };
+        return [...prev, newItem];
+      }
+    });
+  };
+
+  const updateCartItemQuantity = (itemId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      setCartItems(prev => prev.filter(item => item.id !== itemId));
+    } else {
+      setCartItems(prev => prev.map(item =>
+        item.id === itemId ? { ...item, quantity: newQuantity } : item
+      ));
+    }
+  };
+
+  const getCartItemQuantity = (itemId: string, quantityId: string) => {
+    const cartItemId = `${itemId}-${quantityId}`;
+    const cartItem = cartItems.find(item => item.id === cartItemId);
+    return cartItem ? cartItem.quantity : 0;
   };
 
   const filteredItems = items.filter(item => {
@@ -257,7 +324,7 @@ export default function PublicMenuPage() {
           </div>
         </div>
 
-        <div className="px-4 pb-8">
+        <div className="px-4 pb-8" style={{ paddingBottom: cartItems.length > 0 ? '120px' : '32px' }}>
           {/* Popular Items Section */}
           {highlightedItems.length > 0 && (
             <div className="py-4">
@@ -336,25 +403,64 @@ export default function PublicMenuPage() {
                             </div>
                             <h4 className="font-semibold text-lg" style={{ color: 'var(--theme-text)' }}>Pricing Options</h4>
                           </div>
-                          {item.quantityPrices.map((qp, index) => (
-                            <div 
-                              key={index} 
-                              className="flex justify-between items-center py-4 px-4 rounded-lg border-2"
-                              style={{ 
-                                backgroundColor: 'var(--theme-background)',
-                                borderColor: 'var(--theme-accent)',
-                                borderStyle: 'solid'
-                              }}
-                            >
-                              <div>
-                                <span className="font-semibold text-lg" style={{ color: 'var(--theme-text)' }}>{qp.quantityId.value}</span>
-                                <span className="text-sm ml-2 block" style={{ color: 'var(--theme-text-secondary)' }}>({qp.quantityId.description})</span>
+                          {item.quantityPrices.map((qp, index) => {
+                            const cartQuantity = getCartItemQuantity(item._id, qp.quantityId._id);
+                            return (
+                              <div 
+                                key={index} 
+                                className="flex justify-between items-center py-4 px-4 rounded-lg border-2"
+                                style={{ 
+                                  backgroundColor: 'var(--theme-background)',
+                                  borderColor: 'var(--theme-accent)',
+                                  borderStyle: 'solid'
+                                }}
+                              >
+                                <div>
+                                  <span className="font-semibold text-lg" style={{ color: 'var(--theme-text)' }}>{qp.quantityId.value}</span>
+                                  <span className="text-sm ml-2 block" style={{ color: 'var(--theme-text-secondary)' }}>({qp.quantityId.description})</span>
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                  <span className="text-xl font-bold" style={{ color: 'var(--theme-accent)' }}>
+                                    ₹{qp.price.toFixed(2)}
+                                  </span>
+                                  {outlet.orderManagementEnabled && (
+                                    <div className="flex items-center space-x-2">
+                                      {cartQuantity > 0 ? (
+                                        <div className="flex items-center space-x-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => updateCartItemQuantity(`${item._id}-${qp.quantityId._id}`, cartQuantity - 1)}
+                                            className="h-8 w-8 p-0"
+                                          >
+                                            <Minus className="h-4 w-4" />
+                                          </Button>
+                                          <span className="w-8 text-center font-medium">{cartQuantity}</span>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => updateCartItemQuantity(`${item._id}-${qp.quantityId._id}`, cartQuantity + 1)}
+                                            className="h-8 w-8 p-0"
+                                          >
+                                            <Plus className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <Button
+                                          onClick={() => addToCart(item, qp)}
+                                          size="sm"
+                                          className="bg-orange-600 hover:bg-orange-700 text-white"
+                                        >
+                                          <Plus className="h-4 w-4 mr-1" />
+                                          Add
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                              <span className="text-xl font-bold" style={{ color: 'var(--theme-accent)' }}>
-                                ₹{qp.price.toFixed(2)}
-                              </span>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     </DrawerContent>
@@ -364,7 +470,7 @@ export default function PublicMenuPage() {
             </div>
           )}
 
-          {/* Categories Section - Horizontal Scroll with 4 items visible */}
+          {/* Categories Section */}
           {categories.length > 0 && (
             <div className="py-4">
               <div className="flex items-center space-x-2 mb-4">
@@ -374,7 +480,6 @@ export default function PublicMenuPage() {
                 </h2>
               </div>
               
-              {/* Horizontal scrollable categories */}
               <div className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 <style jsx>{`
                   div::-webkit-scrollbar {
@@ -385,9 +490,7 @@ export default function PublicMenuPage() {
                 {/* All Categories Button */}
                 <div
                   onClick={() => setSelectedCategory('all')}
-                  className={`flex-shrink-0 w-28 h-28 cursor-pointer rounded-2xl relative overflow-hidden snap-start transition-all ${
-                    selectedCategory === 'all' ? '' : ''
-                  }`}
+                  className={`flex-shrink-0 w-28 h-28 cursor-pointer rounded-2xl relative overflow-hidden snap-start transition-all`}
                   style={{ 
                     backgroundColor: 'var(--theme-surface)',
                     borderColor: selectedCategory === 'all' ? 'var(--theme-primary)' : 'transparent',
@@ -410,16 +513,13 @@ export default function PublicMenuPage() {
                     <div
                       key={category._id}
                       onClick={() => setSelectedCategory(category._id)}
-                      className={`flex-shrink-0 w-28 h-28 cursor-pointer rounded-2xl relative overflow-hidden snap-start transition-all ${
-                        selectedCategory === category._id ? '' : ''
-                      }`}
+                      className={`flex-shrink-0 w-28 h-28 cursor-pointer rounded-2xl relative overflow-hidden snap-start transition-all`}
                       style={{ 
                         borderColor: selectedCategory === category._id ? 'var(--theme-primary)' : 'transparent',
                         borderWidth: selectedCategory === category._id ? 2 : 0,
                         borderStyle: 'solid'
                       }}
                     >
-                      {/* Background Image */}
                       {category.image ? (
                         <img 
                           src={category.image} 
@@ -430,15 +530,12 @@ export default function PublicMenuPage() {
                         <div className="absolute inset-0 bg-gradient-to-br from-orange-400 to-red-500"></div>
                       )}
                       
-                      {/* Dark Overlay */}
                       <div className="absolute inset-0 bg-black bg-opacity-40"></div>
                       
-                      {/* Text Overlay */}
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-2">
                         <span className="text-sm font-semibold text-center leading-tight mb-1">
                           {category.name}
                         </span>
-
                       </div>
                     </div>
                   );
@@ -470,7 +567,7 @@ export default function PublicMenuPage() {
             <div className="space-y-6">
               {Object.values(groupedItems).map(({ category, items }, idx) => (
                 <section key={category._id}>
-                  {/* Category Header - Enhanced */}
+                  {/* Category Header */}
                   <div
                     className={`flex items-center justify-between mb-4 p-4 rounded-xl ${idx === 0 ? 'mt-2' : 'mt-16'}`}
                     style={{ backgroundColor: 'var(--theme-accent)', color: 'var(--theme-background)' }}
@@ -488,7 +585,7 @@ export default function PublicMenuPage() {
                     </Badge>
                   </div>
 
-                  {/* Items List - Optimized */}
+                  {/* Items List */}
                   <div className="space-y-0 rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--theme-surface)' }}>
                     {items.map((item, index) => (
                       <div key={item._id}>
@@ -526,20 +623,59 @@ export default function PublicMenuPage() {
                                 <h4 className="font-semibold text-base truncate" style={{ color: 'var(--theme-text)' }}>
                                   {item.name}
                                 </h4>
-                                {/* <p className="text-sm " style={{ color: 'var(--theme-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {item.description}
-                                </p> */}
                               </div>
 
-                              {/* Price */}
-                              <div className="flex-shrink-0 text-right">
-                                <p className="font-bold text-lg" style={{ color: 'var(--theme-accent)' }}>
-                                  ₹{item.quantityPrices[0]?.price.toFixed(0)}
-                                </p>
-                                {item.quantityPrices.length > 1 && (
-                                  <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
-                                    +{item.quantityPrices.length - 1} more
+                              {/* Price and Add Button */}
+                              <div className="flex-shrink-0 flex items-center space-x-3">
+                                <div className="text-right">
+                                  <p className="font-bold text-lg" style={{ color: 'var(--theme-accent)' }}>
+                                    ₹{item.quantityPrices[0]?.price.toFixed(0)}
                                   </p>
+                                  {item.quantityPrices.length > 1 && (
+                                    <p className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
+                                      +{item.quantityPrices.length - 1} more
+                                    </p>
+                                  )}
+                                </div>
+                                
+                                {outlet.orderManagementEnabled && (
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    {(() => {
+                                      const firstQuantityPrice = item.quantityPrices[0];
+                                      const cartQuantity = getCartItemQuantity(item._id, firstQuantityPrice.quantityId._id);
+                                      
+                                      return cartQuantity > 0 ? (
+                                        <div className="flex items-center space-x-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => updateCartItemQuantity(`${item._id}-${firstQuantityPrice.quantityId._id}`, cartQuantity - 1)}
+                                            className="h-8 w-8 p-0"
+                                          >
+                                            <Minus className="h-4 w-4" />
+                                          </Button>
+                                          <span className="w-8 text-center font-medium">{cartQuantity}</span>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => updateCartItemQuantity(`${item._id}-${firstQuantityPrice.quantityId._id}`, cartQuantity + 1)}
+                                            className="h-8 w-8 p-0"
+                                          >
+                                            <Plus className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <Button
+                                          onClick={() => addToCart(item, firstQuantityPrice)}
+                                          size="sm"
+                                          className="bg-orange-600 hover:bg-orange-700 text-white"
+                                        >
+                                          <Plus className="h-4 w-4 mr-1" />
+                                          Add
+                                        </Button>
+                                      );
+                                    })()}
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -568,30 +704,68 @@ export default function PublicMenuPage() {
                                   </div>
                                   <h4 className="font-semibold text-lg" style={{ color: 'var(--theme-text)' }}>Pricing Options</h4>
                                 </div>
-                                {item.quantityPrices.map((qp, index) => (
-                                  <div 
-                                    key={index} 
-                                    className="flex justify-between items-center py-4 px-4 rounded-lg border-2"
-                                    style={{ 
-                                      backgroundColor: 'var(--theme-background)',
-                                      borderColor: 'var(--theme-accent)',
-                                      borderStyle: 'solid'
-                                    }}
-                                  >
-                                    <div>
-                                      <span className="font-semibold text-lg" style={{ color: 'var(--theme-text)' }}>{qp.quantityId.value}</span>
-                                      <span className="text-sm ml-2 block" style={{ color: 'var(--theme-text-secondary)' }}>({qp.quantityId.description})</span>
+                                {item.quantityPrices.map((qp, index) => {
+                                  const cartQuantity = getCartItemQuantity(item._id, qp.quantityId._id);
+                                  return (
+                                    <div 
+                                      key={index} 
+                                      className="flex justify-between items-center py-4 px-4 rounded-lg border-2"
+                                      style={{ 
+                                        backgroundColor: 'var(--theme-background)',
+                                        borderColor: 'var(--theme-accent)',
+                                        borderStyle: 'solid'
+                                      }}
+                                    >
+                                      <div>
+                                        <span className="font-semibold text-lg" style={{ color: 'var(--theme-text)' }}>{qp.quantityId.value}</span>
+                                        <span className="text-sm ml-2 block" style={{ color: 'var(--theme-text-secondary)' }}>({qp.quantityId.description})</span>
+                                      </div>
+                                      <div className="flex items-center space-x-3">
+                                        <span className="text-xl font-bold" style={{ color: 'var(--theme-accent)' }}>
+                                          ₹{qp.price.toFixed(2)}
+                                        </span>
+                                        {outlet.orderManagementEnabled && (
+                                          <div className="flex items-center space-x-2">
+                                            {cartQuantity > 0 ? (
+                                              <div className="flex items-center space-x-2">
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() => updateCartItemQuantity(`${item._id}-${qp.quantityId._id}`, cartQuantity - 1)}
+                                                  className="h-8 w-8 p-0"
+                                                >
+                                                  <Minus className="h-4 w-4" />
+                                                </Button>
+                                                <span className="w-8 text-center font-medium">{cartQuantity}</span>
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() => updateCartItemQuantity(`${item._id}-${qp.quantityId._id}`, cartQuantity + 1)}
+                                                  className="h-8 w-8 p-0"
+                                                >
+                                                  <Plus className="h-4 w-4" />
+                                                </Button>
+                                              </div>
+                                            ) : (
+                                              <Button
+                                                onClick={() => addToCart(item, qp)}
+                                                size="sm"
+                                                className="bg-orange-600 hover:bg-orange-700 text-white"
+                                              >
+                                                <Plus className="h-4 w-4 mr-1" />
+                                                Add
+                                              </Button>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                    <span className="text-xl font-bold" style={{ color: 'var(--theme-accent)' }}>
-                                      ₹{qp.price.toFixed(2)}
-                                    </span>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           </DrawerContent>
                         </Drawer>
-                        {/* Separator between items */}
                         {index < items.length - 1 && (
                           <Separator style={{ backgroundColor: 'var(--theme-border)' }} />
                         )}
@@ -606,7 +780,7 @@ export default function PublicMenuPage() {
               <div className="max-w-md mx-auto">
                 {searchQuery || selectedCategory !== 'all' ? (
                   <>
-                    <Search className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--theme-text-secondary)' }} />
+                    <Search className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--theme-text-secondary)' }} />
                     <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--theme-text)' }}>No items found</h3>
                     <p className="mb-6" style={{ color: 'var(--theme-text-secondary)' }}>
                       Try adjusting your search or selecting a different category.
@@ -623,7 +797,7 @@ export default function PublicMenuPage() {
                   </>
                 ) : (
                   <>
-                    <Utensils className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--theme-text-secondary)' }} />
+                    <Utensils className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--theme-text-secondary)' }} />
                     <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--theme-text)' }}>Menu Coming Soon</h3>
                     <p style={{ color: 'var(--theme-text-secondary)' }}>
                       We're working on adding delicious items to our menu. Please check back later!
@@ -634,6 +808,15 @@ export default function PublicMenuPage() {
             </div>
           )}
         </div>
+
+        {/* Order Cart - Always render if order management is enabled */}
+        {outlet.orderManagementEnabled && (
+          <OrderCart
+            outletId={outletId}
+            cartItems={cartItems}
+            onUpdateCart={setCartItems}
+          />
+        )}
 
         {/* Footer */}
         <footer className="border-t mt-8" style={{ backgroundColor: 'var(--theme-surface)', borderTopColor: 'var(--theme-border)' }}>
