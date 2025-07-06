@@ -11,7 +11,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, Dr
 import { Separator } from '@/components/ui/separator';
 import { 
   Store, Search, Leaf, Beef, MapPin, Phone, 
-  ChefHat, Utensils, Star, Clock, Grid3X3, Plus, Minus, ShoppingCart
+  ChefHat, Utensils, Star, Clock, Grid3X3, Plus, Minus, ShoppingCart, History
 } from 'lucide-react';
 import ThemeProvider from '@/components/ThemeProvider';
 import OrderCart from '@/components/OrderCart';

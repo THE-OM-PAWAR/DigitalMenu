@@ -10,9 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { 
-  Clock, DollarSign, User, Hash, MessageSquare, 
-  CheckCircle, XCircle, Loader2, RefreshCw, Wifi, WifiOff,
-  ChefHat, Package, Truck, CheckSquare
+  Clock, User, Hash, MessageSquare, 
+  CheckCircle, Loader2, RefreshCw, Wifi, WifiOff,
+  ChefHat, Package, CheckSquare, AlertCircle, X
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSocket } from '@/hooks/useSocket';
@@ -60,7 +60,7 @@ export default function OrdersPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Socket event listeners
+  // Socket event listeners for real-time updates
   useEffect(() => {
     if (socket && outlet) {
       socket.on('new-order', (order: Order) => {
@@ -155,22 +155,50 @@ export default function OrdersPage() {
     }
   };
 
+  const completeOrder = async (orderId: string) => {
+    setIsUpdating(true);
+    try {
+      const response = await axios.put(`/api/orders/${orderId}`, {
+        orderStatus: OrderStatus.SERVED,
+        paymentStatus: PaymentStatus.PAID
+      });
+
+      const updatedOrder = response.data.order;
+      
+      if (socket) {
+        socket.emit('order-updated', updatedOrder);
+      }
+
+      setOrders(prev => prev.map(order => 
+        order.orderId === orderId ? updatedOrder : order
+      ));
+      
+      if (selectedOrder?.orderId === orderId) {
+        setSelectedOrder(updatedOrder);
+      }
+    } catch (error) {
+      console.error('Error completing order:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const getStatusColor = (status: OrderStatus) => {
     switch (status) {
-      case OrderStatus.TAKEN: return 'bg-blue-100 text-blue-800';
-      case OrderStatus.PREPARING: return 'bg-yellow-100 text-yellow-800';
-      case OrderStatus.PREPARED: return 'bg-green-100 text-green-800';
-      case OrderStatus.SERVED: return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case OrderStatus.TAKEN: return 'bg-blue-100 text-blue-800 border-blue-200';
+      case OrderStatus.PREPARING: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case OrderStatus.PREPARED: return 'bg-green-100 text-green-800 border-green-200';
+      case OrderStatus.SERVED: return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const getPaymentColor = (status: PaymentStatus) => {
     switch (status) {
-      case PaymentStatus.UNPAID: return 'bg-red-100 text-red-800';
-      case PaymentStatus.PAID: return 'bg-green-100 text-green-800';
-      case PaymentStatus.CANCELLED: return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case PaymentStatus.UNPAID: return 'bg-red-100 text-red-800 border-red-200';
+      case PaymentStatus.PAID: return 'bg-green-100 text-green-800 border-green-200';
+      case PaymentStatus.CANCELLED: return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -184,6 +212,15 @@ export default function OrdersPage() {
     }
   };
 
+  const canCompleteOrder = (order: Order) => {
+    return (order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.UNPAID) ||
+           (order.orderStatus === OrderStatus.PREPARED && order.paymentStatus === PaymentStatus.PAID);
+  };
+
+  const isOrderCompleted = (order: Order) => {
+    return order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.PAID;
+  };
+
   const handleOrderClick = (order: Order) => {
     setSelectedOrder(order);
     if (isMobile) {
@@ -195,6 +232,10 @@ export default function OrdersPage() {
     await signOut();
     router.push('/');
   };
+
+  // Filter orders: show active orders first, then completed ones
+  const activeOrders = orders.filter(order => !isOrderCompleted(order));
+  const completedOrders = orders.filter(order => isOrderCompleted(order));
 
   if (loading || isLoading) {
     return (
@@ -229,13 +270,13 @@ export default function OrdersPage() {
               <div className="flex items-center space-x-2">
                 {isConnected ? (
                   <>
-                    <Wifi className="h-4 w-4 text-green-600" />
-                    <span className="text-sm text-green-600">Connected</span>
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm text-green-600 font-medium">Live</span>
                   </>
                 ) : (
                   <>
-                    <WifiOff className="h-4 w-4 text-red-600" />
-                    <span className="text-sm text-red-600">Disconnected</span>
+                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                    <span className="text-sm text-red-600 font-medium">Offline</span>
                   </>
                 )}
               </div>
@@ -244,6 +285,7 @@ export default function OrdersPage() {
                 variant="outline"
                 onClick={fetchData}
                 disabled={isLoading}
+                size="sm"
                 className="border-gray-300"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -254,38 +296,39 @@ export default function OrdersPage() {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Orders List - Larger on desktop */}
-          <div className="lg:col-span-2">
-            <Card className="border-0 shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Clock className="h-5 w-5 mr-2" />
-                  Recent Orders ({orders.length})
-                </CardTitle>
-                <CardDescription>
-                  Orders are displayed in chronological order
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                {orders.length > 0 ? (
+          {/* Orders List */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Active Orders */}
+            {activeOrders.length > 0 && (
+              <Card className="border-0 shadow-sm">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center text-lg">
+                    <Clock className="h-5 w-5 mr-2 text-orange-500" />
+                    Active Orders ({activeOrders.length})
+                  </CardTitle>
+                  <CardDescription>
+                    Orders currently being processed
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
                   <div className="space-y-0">
-                    {orders.map((order, index) => (
+                    {activeOrders.map((order, index) => (
                       <div key={order.orderId}>
                         <div
                           onClick={() => handleOrderClick(order)}
-                          className={`p-4 cursor-pointer transition-colors hover:bg-gray-50 ${
+                          className={`p-4 cursor-pointer transition-all hover:bg-gray-50 ${
                             selectedOrder?.orderId === order.orderId ? 'bg-blue-50 border-l-4 border-blue-500' : ''
                           }`}
                         >
-                          <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center space-x-3">
                               <div className="flex items-center space-x-2">
                                 {getStatusIcon(order.orderStatus)}
                                 <span className="font-mono text-sm font-semibold">
-                                  {order.orderId}
+                                  #{order.orderId.split('-')[1]}
                                 </span>
                               </div>
-                              <Badge className={getStatusColor(order.orderStatus)}>
+                              <Badge className={`${getStatusColor(order.orderStatus)} border`}>
                                 {order.orderStatus}
                               </Badge>
                             </div>
@@ -297,7 +340,7 @@ export default function OrdersPage() {
                             </div>
                           </div>
                           
-                          <div className="flex items-center justify-between text-sm text-gray-600">
+                          <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
                             <div className="flex items-center space-x-4">
                               {order.customerName && (
                                 <div className="flex items-center space-x-1">
@@ -315,8 +358,8 @@ export default function OrdersPage() {
                             <span>{new Date(order.timestamps.created).toLocaleTimeString()}</span>
                           </div>
                           
-                          {/* Item badges */}
-                          <div className="flex flex-wrap gap-1 mt-2">
+                          {/* Item summary */}
+                          <div className="flex flex-wrap gap-1">
                             {order.items.slice(0, 3).map((item, idx) => (
                               <Badge key={idx} variant="secondary" className="text-xs">
                                 {item.quantity}x {item.name}
@@ -329,19 +372,87 @@ export default function OrdersPage() {
                             )}
                           </div>
                         </div>
-                        {index < orders.length - 1 && <Separator />}
+                        {index < activeOrders.length - 1 && <Separator />}
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="text-center py-16">
-                    <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No orders yet</h3>
-                    <p className="text-gray-600">Orders will appear here when customers place them</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Completed Orders */}
+            {completedOrders.length > 0 && (
+              <Card className="border-0 shadow-sm">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center text-lg">
+                    <CheckCircle className="h-5 w-5 mr-2 text-green-500" />
+                    Completed Orders ({completedOrders.length})
+                  </CardTitle>
+                  <CardDescription>
+                    Recently completed orders
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="space-y-0">
+                    {completedOrders.slice(0, 10).map((order, index) => (
+                      <div key={order.orderId}>
+                        <div
+                          onClick={() => handleOrderClick(order)}
+                          className={`p-4 cursor-pointer transition-all hover:bg-gray-50 opacity-75 ${
+                            selectedOrder?.orderId === order.orderId ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-3">
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                              <span className="font-mono text-sm font-semibold">
+                                #{order.orderId.split('-')[1]}
+                              </span>
+                              <Badge className="bg-green-100 text-green-800 border-green-200 border">
+                                Completed
+                              </Badge>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold">₹{order.totalAmount.toFixed(2)}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between text-sm text-gray-500">
+                            <div className="flex items-center space-x-4">
+                              {order.customerName && (
+                                <div className="flex items-center space-x-1">
+                                  <User className="h-3 w-3" />
+                                  <span>{order.customerName}</span>
+                                </div>
+                              )}
+                              {order.tableNumber && (
+                                <div className="flex items-center space-x-1">
+                                  <Hash className="h-3 w-3" />
+                                  <span>Table {order.tableNumber}</span>
+                                </div>
+                              )}
+                            </div>
+                            <span>{new Date(order.timestamps.created).toLocaleTimeString()}</span>
+                          </div>
+                        </div>
+                        {index < Math.min(completedOrders.length, 10) - 1 && <Separator />}
+                      </div>
+                    ))}
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* No Orders State */}
+            {orders.length === 0 && (
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-16 text-center">
+                  <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No orders yet</h3>
+                  <p className="text-gray-600">Orders will appear here when customers place them</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Order Details - Desktop */}
@@ -352,6 +463,7 @@ export default function OrdersPage() {
                   order={selectedOrder}
                   onUpdateStatus={updateOrderStatus}
                   onUpdateComments={updateComments}
+                  onCompleteOrder={completeOrder}
                   isUpdating={isUpdating}
                 />
               ) : (
@@ -376,7 +488,7 @@ export default function OrdersPage() {
               <SheetHeader>
                 <SheetTitle className="flex items-center">
                   <MessageSquare className="h-5 w-5 mr-2" />
-                  Order Details
+                  Order #{selectedOrder.orderId.split('-')[1]}
                 </SheetTitle>
                 <SheetDescription>
                   Manage order status and view details
@@ -387,6 +499,7 @@ export default function OrdersPage() {
                   order={selectedOrder}
                   onUpdateStatus={updateOrderStatus}
                   onUpdateComments={updateComments}
+                  onCompleteOrder={completeOrder}
                   isUpdating={isUpdating}
                 />
               </div>
@@ -403,11 +516,13 @@ function OrderDetailsPanel({
   order, 
   onUpdateStatus, 
   onUpdateComments, 
+  onCompleteOrder,
   isUpdating 
 }: {
   order: Order;
   onUpdateStatus: (orderId: string, field: 'orderStatus' | 'paymentStatus', value: string) => void;
   onUpdateComments: (orderId: string, comments: string) => void;
+  onCompleteOrder: (orderId: string) => void;
   isUpdating: boolean;
 }) {
   const [comments, setComments] = useState(order.comments || '');
@@ -422,55 +537,78 @@ function OrderDetailsPanel({
     }
   };
 
+  const canCompleteOrder = (order: Order) => {
+    return (order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.UNPAID) ||
+           (order.orderStatus === OrderStatus.PREPARED && order.paymentStatus === PaymentStatus.PAID);
+  };
+
+  const isOrderCompleted = (order: Order) => {
+    return order.orderStatus === OrderStatus.SERVED && order.paymentStatus === PaymentStatus.PAID;
+  };
+
   return (
     <Card className="border-0 shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-lg font-mono">{order.orderId}</CardTitle>
-        <CardDescription>
-          Placed at {new Date(order.timestamps.created).toLocaleString()}
-        </CardDescription>
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg font-mono">#{order.orderId.split('-')[1]}</CardTitle>
+            <CardDescription>
+              {new Date(order.timestamps.created).toLocaleString()}
+            </CardDescription>
+          </div>
+          {isOrderCompleted(order) && (
+            <Badge className="bg-green-100 text-green-800 border-green-200">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Completed
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Customer Info */}
         {(order.customerName || order.tableNumber) && (
-          <div className="space-y-2">
-            <h4 className="font-semibold">Customer Information</h4>
-            {order.customerName && (
-              <div className="flex items-center space-x-2">
-                <User className="h-4 w-4 text-gray-500" />
-                <span>{order.customerName}</span>
-              </div>
-            )}
-            {order.tableNumber && (
-              <div className="flex items-center space-x-2">
-                <Hash className="h-4 w-4 text-gray-500" />
-                <span>Table {order.tableNumber}</span>
-              </div>
-            )}
+          <div className="space-y-3">
+            <h4 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Customer Information</h4>
+            <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+              {order.customerName && (
+                <div className="flex items-center space-x-2">
+                  <User className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm">{order.customerName}</span>
+                </div>
+              )}
+              {order.tableNumber && (
+                <div className="flex items-center space-x-2">
+                  <Hash className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm">Table {order.tableNumber}</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* Order Items */}
         <div className="space-y-3">
-          <h4 className="font-semibold">Order Items</h4>
-          {order.items.map((item, index) => (
-            <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <div>
-                <p className="font-medium">{item.name}</p>
-                <p className="text-sm text-gray-600">{item.quantityDescription}</p>
+          <h4 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Order Items</h4>
+          <div className="space-y-2">
+            {order.items.map((item, index) => (
+              <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <p className="font-medium text-sm">{item.name}</p>
+                  <p className="text-xs text-gray-600">{item.quantityDescription}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-sm">{item.quantity}x ₹{item.price.toFixed(2)}</p>
+                  <p className="text-xs text-gray-600">₹{(item.quantity * item.price).toFixed(2)}</p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="font-semibold">{item.quantity}x ₹{item.price.toFixed(2)}</p>
-                <p className="text-sm text-gray-600">₹{(item.quantity * item.price).toFixed(2)}</p>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <Separator />
 
         {/* Total */}
-        <div className="flex justify-between items-center text-lg font-bold">
+        <div className="flex justify-between items-center text-lg font-bold bg-gray-50 rounded-lg p-3">
           <span>Total Amount:</span>
           <span>₹{order.totalAmount.toFixed(2)}</span>
         </div>
@@ -478,63 +616,92 @@ function OrderDetailsPanel({
         <Separator />
 
         {/* Status Controls */}
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Order Status</label>
-            <Select
-              value={order.orderStatus}
-              onValueChange={(value) => onUpdateStatus(order.orderId, 'orderStatus', value)}
-              disabled={isUpdating}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={OrderStatus.TAKEN}>Taken</SelectItem>
-                <SelectItem value={OrderStatus.PREPARING}>Preparing</SelectItem>
-                <SelectItem value={OrderStatus.PREPARED}>Prepared</SelectItem>
-                <SelectItem value={OrderStatus.SERVED}>Served</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {!isOrderCompleted(order) && (
+          <div className="space-y-4">
+            <h4 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Order Management</h4>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Order Status</label>
+                <Select
+                  value={order.orderStatus}
+                  onValueChange={(value) => onUpdateStatus(order.orderId, 'orderStatus', value)}
+                  disabled={isUpdating}
+                >
+                  <SelectTrigger className="text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={OrderStatus.TAKEN}>Taken</SelectItem>
+                    <SelectItem value={OrderStatus.PREPARING}>Preparing</SelectItem>
+                    <SelectItem value={OrderStatus.PREPARED}>Prepared</SelectItem>
+                    <SelectItem value={OrderStatus.SERVED}>Served</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Payment Status</label>
-            <Select
-              value={order.paymentStatus}
-              onValueChange={(value) => onUpdateStatus(order.orderId, 'paymentStatus', value)}
-              disabled={isUpdating}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={PaymentStatus.UNPAID}>Unpaid</SelectItem>
-                <SelectItem value={PaymentStatus.PAID}>Paid</SelectItem>
-                <SelectItem value={PaymentStatus.CANCELLED}>Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Payment Status</label>
+                <Select
+                  value={order.paymentStatus}
+                  onValueChange={(value) => onUpdateStatus(order.orderId, 'paymentStatus', value)}
+                  disabled={isUpdating}
+                >
+                  <SelectTrigger className="text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={PaymentStatus.UNPAID}>Unpaid</SelectItem>
+                    <SelectItem value={PaymentStatus.PAID}>Paid</SelectItem>
+                    <SelectItem value={PaymentStatus.CANCELLED}>Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Complete Order Button */}
+            {canCompleteOrder(order) && (
+              <Button
+                onClick={() => onCompleteOrder(order.orderId)}
+                disabled={isUpdating}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Completing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Complete Order
+                  </>
+                )}
+              </Button>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Comments */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">Comments/Notes</label>
+          <label className="text-sm font-medium">Notes</label>
           <Textarea
             placeholder="Add notes about this order..."
             value={comments}
             onChange={(e) => setComments(e.target.value)}
             onBlur={handleCommentsBlur}
             rows={3}
+            className="text-sm"
+            disabled={isOrderCompleted(order)}
           />
         </div>
 
-        {/* Order Comments from Customer */}
+        {/* Customer Comments */}
         {order.comments && (
           <div className="space-y-2">
             <label className="text-sm font-medium">Customer Instructions</label>
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm">{order.comments}</p>
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-sm text-blue-800">{order.comments}</p>
             </div>
           </div>
         )}
