@@ -16,7 +16,6 @@ import {
 import ThemeProvider from '@/components/ThemeProvider';
 import OrderCart from '@/components/OrderCart';
 import { OrderItem } from '@/lib/orderTypes';
-import { useSocket } from '@/hooks/useSocket';
 import axios from 'axios';
 
 interface Outlet {
@@ -72,20 +71,11 @@ export default function PublicMenuPage() {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [error, setError] = useState<string>('');
 
-  // Initialize socket connection
-  const { socket, isConnected } = useSocket(outletId);
-
   useEffect(() => {
     if (outletId) {
       fetchMenuData();
     }
   }, [outletId]);
-
-  // Debug socket connection
-  useEffect(() => {
-    console.log('Menu page - Socket connection status:', isConnected);
-    console.log('Menu page - Socket instance:', socket?.id);
-  }, [isConnected, socket]);
 
   // Load cart from localStorage on component mount
   useEffect(() => {
@@ -258,27 +248,6 @@ export default function PublicMenuPage() {
   return (
     <ThemeProvider themeId={outlet.theme || 'modern'}>
       <div className="min-h-screen" style={{ backgroundColor: 'var(--theme-background)', color: 'var(--theme-text)' }}>
-        {/* Connection Status Indicator */}
-        <div className="fixed top-4 right-4 z-50">
-          <div className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-medium ${
-            isConnected 
-              ? 'bg-green-100 text-green-800' 
-              : 'bg-red-100 text-red-800'
-          }`}>
-            {isConnected ? (
-              <>
-                <Wifi className="h-4 w-4" />
-                <span>Live</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-4 w-4" />
-                <span>Offline</span>
-              </>
-            )}
-          </div>
-        </div>
-
         {/* Header */}
         <div className="sticky top-0 z-50" style={{ backgroundColor: 'var(--theme-background)', borderBottomColor: 'var(--theme-border)' }}>
           <div className="px-4 py-4 border-b">

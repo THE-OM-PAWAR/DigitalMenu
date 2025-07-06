@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useSocket } from '@/hooks/useSocket';
+import { useSSE } from '@/hooks/useSSE';
 import { Order, OrderItem, OrderStatus, PaymentStatus } from '@/lib/orderTypes';
 import axios from 'axios';
 
@@ -20,7 +20,6 @@ interface UseOrderSyncProps {
 }
 
 export function useOrderSync({ outletId, onOrderUpdate, onOrderComplete }: UseOrderSyncProps) {
-  const { socket, isConnected } = useSocket(outletId);
   const [syncState, setSyncState] = useState<OrderSyncState>({
     activeOrder: null,
     orderHistory: [],
@@ -30,19 +29,19 @@ export function useOrderSync({ outletId, onOrderUpdate, onOrderComplete }: UseOr
   });
 
   const syncTimeoutRef = useRef<NodeJS.Timeout>();
-  const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 5;
+  const mountedRef = useRef(true);
 
   // Storage keys
   const getStorageKeys = useCallback(() => ({
     activeOrder: `activeOrder-${outletId}`,
     orderHistory: `orderHistory-${outletId}`,
     lastSync: `lastSync-${outletId}`,
-    socketRoom: `socketRoom-${outletId}`
   }), [outletId]);
 
   // Load data from localStorage
   const loadFromStorage = useCallback(() => {
+    if (!outletId) return { activeOrder: null, orderHistory: [], lastSyncTime: 0 };
+    
     const keys = getStorageKeys();
     try {
       const activeOrderData = localStorage.getItem(keys.activeOrder);
@@ -53,22 +52,26 @@ export function useOrderSync({ outletId, onOrderUpdate, onOrderComplete }: UseOr
       const orderHistory = historyData ? JSON.parse(historyData) : [];
       const lastSyncTime = lastSyncData ? parseInt(lastSyncData) : 0;
 
-      setSyncState(prev => ({
-        ...prev,
-        activeOrder,
-        orderHistory,
-        lastSyncTime
-      }));
+      if (mountedRef.current) {
+        setSyncState(prev => ({
+          ...prev,
+          activeOrder,
+          orderHistory,
+          lastSyncTime
+        }));
+      }
 
       return { activeOrder, orderHistory, lastSyncTime };
     } catch (error) {
       console.error('Error loading from storage:', error);
       return { activeOrder: null, orderHistory: [], lastSyncTime: 0 };
     }
-  }, [getStorageKeys]);
+  }, [getStorageKeys, outletId]);
 
   // Save data to localStorage
   const saveToStorage = useCallback((data: Partial<OrderSyncState>) => {
+    if (!outletId) return;
+    
     const keys = getStorageKeys();
     try {
       if (data.activeOrder !== undefined) {
@@ -87,7 +90,7 @@ export function useOrderSync({ outletId, onOrderUpdate, onOrderComplete }: UseOr
     } catch (error) {
       console.error('Error saving to storage:', error);
     }
-  }, [getStorageKeys]);
+  }, [getStorageKeys, outletId]);
 
   // Check if order is completed
   const isOrderCompleted = useCallback((order: Order) => {
@@ -96,6 +99,8 @@ export function useOrderSync({ outletId, onOrderUpdate, onOrderComplete }: UseOr
 
   // Move order to history
   const moveOrderToHistory = useCallback((order: Order) => {
+    if (!mountedRef.current) return;
+    
     console.log('Moving order to history:', order.orderId);
     
     setSyncState(prev => {
@@ -123,6 +128,8 @@ export function useOrderSync({ outletId, onOrderUpdate, onOrderComplete }: UseOr
 
   // Update active order
   const updateActiveOrder = useCallback((order: Order) => {
+    if (!mountedRef.current) return;
+    
     console.log('Updating active order:', order.orderId);
     
     if (isOrderCompleted(order)) {
@@ -150,12 +157,62 @@ export function useOrderSync({ outletId, onOrderUpdate, onOrderComplete }: UseOr
     }
   }, [isOrderCompleted, moveOrderToHistory, saveToStorage, onOrderUpdate]);
 
+  // SSE event handlers
+  const handleNewOrder = useCallback((order: Order) => {
+    console.log('New order received:', order.orderId);
+    updateActiveOrder(order);
+  }, [updateActiveOrder]);
+
+  const handleOrderUpdate = useCallback((order: Order) => {
+    console.log('Order update received:', order.orderId);
+    updateActiveOrder(order);
+  }, [updateActiveOrder]);
+
+  const handleOrderComplete = useCallback((order: Order) => {
+    console.log('Order completion received:', order.orderId);
+    moveOrderToHistory(order);
+  }, [moveOrderToHistory]);
+
+  const handleSSEConnect = useCallback(() => {
+    if (!mountedRef.current) return;
+    console.log('SSE connected');
+    setSyncState(prev => ({ ...prev, connectionStatus: 'connected' }));
+  }, []);
+
+  const handleSSEDisconnect = useCallback(() => {
+    if (!mountedRef.current) return;
+    console.log('SSE disconnected');
+    setSyncState(prev => ({ ...prev, connectionStatus: 'disconnected' }));
+  }, []);
+
+  const handleSSEError = useCallback((error: string) => {
+    console.error('SSE error:', error);
+  }, []);
+
+  // Initialize SSE connection only if outletId is valid
+  const { isConnected, connectionStatus, reconnect: sseReconnect } = useSSE({
+    outletId: outletId && outletId.length === 24 ? outletId : undefined, // Only connect if valid ObjectId
+    onNewOrder: handleNewOrder,
+    onOrderUpdate: handleOrderUpdate,
+    onOrderComplete: handleOrderComplete,
+    onConnect: handleSSEConnect,
+    onDisconnect: handleSSEDisconnect,
+    onError: handleSSEError
+  });
+
+  // Update connection status from SSE
+  useEffect(() => {
+    if (mountedRef.current) {
+      setSyncState(prev => ({ ...prev, connectionStatus }));
+    }
+  }, [connectionStatus]);
+
   // Fetch order data from server
   const fetchOrderData = useCallback(async (orderId?: string) => {
     if (!orderId && !syncState.activeOrder) return;
     
     const targetOrderId = orderId || syncState.activeOrder?.orderId;
-    if (!targetOrderId) return;
+    if (!targetOrderId || !mountedRef.current) return;
 
     setSyncState(prev => ({ ...prev, isLoading: true }));
 
@@ -164,125 +221,44 @@ export function useOrderSync({ outletId, onOrderUpdate, onOrderComplete }: UseOr
       const response = await axios.get(`/api/orders/${targetOrderId}`);
       const order = response.data.order;
       
-      if (order) {
+      if (order && mountedRef.current) {
         updateActiveOrder(order);
       }
     } catch (error) {
       console.error('Error fetching order data:', error);
       // If order not found, it might have been completed
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
+      if (axios.isAxiosError(error) && error.response?.status === 404 && mountedRef.current) {
         setSyncState(prev => {
           saveToStorage({ activeOrder: null });
           return { ...prev, activeOrder: null };
         });
       }
     } finally {
-      setSyncState(prev => ({ ...prev, isLoading: false }));
+      if (mountedRef.current) {
+        setSyncState(prev => ({ ...prev, isLoading: false }));
+      }
     }
   }, [syncState.activeOrder, updateActiveOrder, saveToStorage]);
 
-  // Handle socket connection
-  const handleSocketConnection = useCallback(() => {
-    if (!socket || !isConnected) return;
-
-    console.log('Socket connected, setting up order sync for outlet:', outletId);
-    
-    setSyncState(prev => ({ ...prev, connectionStatus: 'connected' }));
-    reconnectAttemptsRef.current = 0;
-
-    // Join outlet room
-    socket.emit('join-outlet', outletId);
-
-    // Store room info
-    const keys = getStorageKeys();
-    localStorage.setItem(keys.socketRoom, outletId);
-
-    // If we have an active order, join its specific room too
-    if (syncState.activeOrder) {
-      const orderRoom = `order-${syncState.activeOrder.orderId}`;
-      socket.emit('join-order-room', orderRoom);
-      console.log('Joined order room:', orderRoom);
-    }
-
-    // Fetch latest data after reconnection
-    if (syncState.activeOrder) {
-      fetchOrderData();
-    }
-  }, [socket, isConnected, outletId, syncState.activeOrder, fetchOrderData, getStorageKeys]);
-
-  // Handle socket disconnection
-  const handleSocketDisconnection = useCallback(() => {
-    console.log('Socket disconnected');
-    setSyncState(prev => ({ ...prev, connectionStatus: 'disconnected' }));
-    
-    // Attempt to reconnect
-    if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-      setSyncState(prev => ({ ...prev, connectionStatus: 'reconnecting' }));
-      reconnectAttemptsRef.current++;
-      
-      syncTimeoutRef.current = setTimeout(() => {
-        if (syncState.activeOrder) {
-          fetchOrderData();
-        }
-      }, 2000 * reconnectAttemptsRef.current); // Exponential backoff
-    }
-  }, [syncState.activeOrder, fetchOrderData]);
-
-  // Set up socket event listeners
-  useEffect(() => {
-    if (!socket) return;
-
-    // Connection events
-    socket.on('connect', handleSocketConnection);
-    socket.on('disconnect', handleSocketDisconnection);
-
-    // Order update events
-    socket.on('order-updated', (updatedOrder: Order) => {
-      console.log('Received order update via socket:', updatedOrder.orderId);
-      if (syncState.activeOrder && updatedOrder.orderId === syncState.activeOrder.orderId) {
-        updateActiveOrder(updatedOrder);
-      }
-    });
-
-    // Order completion events
-    socket.on('order-completed', (completedOrder: Order) => {
-      console.log('Received order completion via socket:', completedOrder.orderId);
-      if (syncState.activeOrder && completedOrder.orderId === syncState.activeOrder.orderId) {
-        moveOrderToHistory(completedOrder);
-      }
-    });
-
-    // Room join confirmation
-    socket.on('joined-outlet', (data) => {
-      console.log('Successfully joined outlet room:', data);
-    });
-
-    socket.on('joined-order-room', (data) => {
-      console.log('Successfully joined order room:', data);
-    });
-
-    return () => {
-      socket.off('connect', handleSocketConnection);
-      socket.off('disconnect', handleSocketDisconnection);
-      socket.off('order-updated');
-      socket.off('order-completed');
-      socket.off('joined-outlet');
-      socket.off('joined-order-room');
-    };
-  }, [socket, syncState.activeOrder, handleSocketConnection, handleSocketDisconnection, updateActiveOrder, moveOrderToHistory]);
-
   // Load initial data from storage
   useEffect(() => {
+    mountedRef.current = true;
     loadFromStorage();
+    
+    return () => {
+      mountedRef.current = false;
+    };
   }, [loadFromStorage]);
 
   // Periodic sync when disconnected
   useEffect(() => {
-    if (!isConnected && syncState.activeOrder) {
+    if (!isConnected && syncState.activeOrder && mountedRef.current) {
       const interval = setInterval(() => {
-        console.log('Periodic sync - fetching order data');
-        fetchOrderData();
-      }, 10000); // Sync every 10 seconds when disconnected
+        if (mountedRef.current) {
+          console.log('Periodic sync - fetching order data');
+          fetchOrderData();
+        }
+      }, 15000); // Sync every 15 seconds when disconnected
 
       return () => clearInterval(interval);
     }
@@ -291,6 +267,7 @@ export function useOrderSync({ outletId, onOrderUpdate, onOrderComplete }: UseOr
   // Cleanup
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
       if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current);
       }
@@ -305,6 +282,8 @@ export function useOrderSync({ outletId, onOrderUpdate, onOrderComplete }: UseOr
     customerName?: string;
     tableNumber?: string;
   }) => {
+    if (!mountedRef.current) return;
+    
     try {
       setSyncState(prev => ({ ...prev, isLoading: true }));
       
@@ -316,26 +295,25 @@ export function useOrderSync({ outletId, onOrderUpdate, onOrderComplete }: UseOr
       const newOrder = response.data.order;
       console.log('Order created:', newOrder.orderId);
 
-      // Emit socket event for real-time update to manager
-      if (socket) {
-        socket.emit('new-order', newOrder);
-        
-        // Join the specific order room
-        const orderRoom = `order-${newOrder.orderId}`;
-        socket.emit('join-order-room', orderRoom);
+      // The SSE stream will automatically pick up this new order
+      // No need to manually emit events like with Socket.IO
+      if (mountedRef.current) {
+        updateActiveOrder(newOrder);
       }
-
-      updateActiveOrder(newOrder);
       return newOrder;
     } catch (error) {
       console.error('Error creating order:', error);
       throw error;
     } finally {
-      setSyncState(prev => ({ ...prev, isLoading: false }));
+      if (mountedRef.current) {
+        setSyncState(prev => ({ ...prev, isLoading: false }));
+      }
     }
-  }, [outletId, socket, updateActiveOrder]);
+  }, [outletId, updateActiveOrder]);
 
   const updateOrder = useCallback(async (orderId: string, updates: Partial<Order>) => {
+    if (!mountedRef.current) return;
+    
     try {
       setSyncState(prev => ({ ...prev, isLoading: true }));
       
@@ -344,28 +322,36 @@ export function useOrderSync({ outletId, onOrderUpdate, onOrderComplete }: UseOr
       
       console.log('Order updated:', updatedOrder.orderId);
 
-      // Emit socket event for real-time update
-      if (socket) {
-        socket.emit('order-updated', updatedOrder);
+      // The SSE stream will automatically pick up this update
+      // No need to manually emit events like with Socket.IO
+      if (mountedRef.current) {
+        updateActiveOrder(updatedOrder);
       }
-
-      updateActiveOrder(updatedOrder);
       return updatedOrder;
     } catch (error) {
       console.error('Error updating order:', error);
       throw error;
     } finally {
-      setSyncState(prev => ({ ...prev, isLoading: false }));
+      if (mountedRef.current) {
+        setSyncState(prev => ({ ...prev, isLoading: false }));
+      }
     }
-  }, [socket, updateActiveOrder]);
+  }, [updateActiveOrder]);
 
   const refreshOrder = useCallback(() => {
+    if (!mountedRef.current) return;
+    
     if (syncState.activeOrder) {
       fetchOrderData(syncState.activeOrder.orderId);
+    } else {
+      // Try to reconnect SSE
+      sseReconnect();
     }
-  }, [syncState.activeOrder, fetchOrderData]);
+  }, [syncState.activeOrder, fetchOrderData, sseReconnect]);
 
   const clearActiveOrder = useCallback(() => {
+    if (!mountedRef.current) return;
+    
     setSyncState(prev => {
       saveToStorage({ activeOrder: null });
       return { ...prev, activeOrder: null };

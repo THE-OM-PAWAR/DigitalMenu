@@ -15,7 +15,6 @@ import {
   ChefHat, Package, CheckSquare, AlertCircle, X
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useSocket } from '@/hooks/useSocket';
 import DashboardHeader from '@/components/DashboardHeader';
 import { Order, OrderStatus, PaymentStatus } from '@/lib/orderTypes';
 import axios from 'axios';
@@ -36,7 +35,7 @@ export default function OrdersPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const { socket, isConnected } = useSocket(outlet?._id);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('disconnected');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -60,47 +59,16 @@ export default function OrdersPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Socket event listeners for real-time updates
+  // Simple polling for real-time updates (fallback approach)
   useEffect(() => {
-    if (socket && outlet) {
-      console.log('Setting up socket listeners for orders page');
-      
-      // Join outlet room
-      socket.emit('join-outlet', outlet._id);
+    if (!outlet) return;
 
-      socket.on('new-order', (order: Order) => {
-        console.log('Manager received new order:', order);
-        setOrders(prev => [order, ...prev]);
-      });
+    const interval = setInterval(() => {
+      fetchOrders();
+    }, 10000); // Poll every 10 seconds
 
-      socket.on('order-updated', (updatedOrder: Order) => {
-        console.log('Manager received order update:', updatedOrder);
-        setOrders(prev => prev.map(order => 
-          order.orderId === updatedOrder.orderId ? updatedOrder : order
-        ));
-        if (selectedOrder?.orderId === updatedOrder.orderId) {
-          setSelectedOrder(updatedOrder);
-        }
-      });
-
-      socket.on('order-completed', (completedOrder: Order) => {
-        console.log('Manager received order completion:', completedOrder);
-        setOrders(prev => prev.map(order => 
-          order.orderId === completedOrder.orderId ? completedOrder : order
-        ));
-        if (selectedOrder?.orderId === completedOrder.orderId) {
-          setSelectedOrder(completedOrder);
-        }
-      });
-
-      return () => {
-        console.log('Cleaning up socket listeners for orders page');
-        socket.off('new-order');
-        socket.off('order-updated');
-        socket.off('order-completed');
-      };
-    }
-  }, [socket, outlet, selectedOrder]);
+    return () => clearInterval(interval);
+  }, [outlet]);
 
   const fetchData = async () => {
     try {
@@ -125,6 +93,19 @@ export default function OrdersPage() {
     }
   };
 
+  const fetchOrders = async () => {
+    if (!outlet) return;
+    
+    try {
+      const ordersResponse = await axios.get(`/api/orders?outletId=${outlet._id}`);
+      setOrders(ordersResponse.data.orders || []);
+      setConnectionStatus('connected');
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      setConnectionStatus('disconnected');
+    }
+  };
+
   const updateOrderStatus = async (orderId: string, field: 'orderStatus' | 'paymentStatus', value: string) => {
     setIsUpdating(true);
     try {
@@ -135,11 +116,7 @@ export default function OrdersPage() {
       const updatedOrder = response.data.order;
       console.log('Order status updated:', updatedOrder);
       
-      // Emit socket event for real-time update to customer
-      if (socket) {
-        socket.emit('order-updated', updatedOrder);
-      }
-
+      // Update local state
       setOrders(prev => prev.map(order => 
         order.orderId === orderId ? updatedOrder : order
       ));
@@ -159,10 +136,7 @@ export default function OrdersPage() {
       const response = await axios.put(`/api/orders/${orderId}`, { comments });
       const updatedOrder = response.data.order;
       
-      if (socket) {
-        socket.emit('order-updated', updatedOrder);
-      }
-
+      // Update local state
       setOrders(prev => prev.map(order => 
         order.orderId === orderId ? updatedOrder : order
       ));
@@ -186,12 +160,7 @@ export default function OrdersPage() {
       const completedOrder = response.data.order;
       console.log('Order completed:', completedOrder);
       
-      // Emit socket event for real-time update to customer
-      if (socket) {
-        socket.emit('order-completed', completedOrder);
-        socket.emit('order-updated', completedOrder);
-      }
-
+      // Update local state
       setOrders(prev => prev.map(order => 
         order.orderId === orderId ? completedOrder : order
       ));
@@ -291,16 +260,21 @@ export default function OrdersPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Order Management</h1>
-              <p className="text-gray-600">Real-time order tracking and management</p>
+              <p className="text-gray-600">Track and manage incoming orders</p>
             </div>
             
             <div className="flex items-center space-x-4">
               {/* Connection Status */}
               <div className="flex items-center space-x-2">
-                {isConnected ? (
+                {connectionStatus === 'connected' ? (
                   <>
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                     <span className="text-sm text-green-600 font-medium">Live</span>
+                  </>
+                ) : connectionStatus === 'reconnecting' ? (
+                  <>
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm text-yellow-600 font-medium">Reconnecting</span>
                   </>
                 ) : (
                   <>
@@ -312,7 +286,7 @@ export default function OrdersPage() {
               
               <Button
                 variant="outline"
-                onClick={fetchData}
+                onClick={fetchOrders}
                 disabled={isLoading}
                 size="sm"
                 className="border-gray-300"
