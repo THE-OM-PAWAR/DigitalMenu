@@ -5,6 +5,28 @@ import { ObjectId } from 'mongodb';
 
 export async function GET(request: NextRequest) {
   try {
+    // Disable SSE on Vercel production environment
+    // Vercel's serverless functions don't support long-lived connections like SSE with MongoDB Change Streams
+    if (process.env.VERCEL_ENV === 'production' || process.env.VERCEL) {
+      console.log('SSE disabled on Vercel production environment');
+      return new Response(
+        JSON.stringify({
+          error: 'Server-Sent Events are not supported in this environment',
+          message: 'Real-time updates are disabled on serverless platforms. The application will use polling for updates.',
+          fallback: 'polling'
+        }),
+        { 
+          status: 501,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET',
+            'Access-Control-Allow-Headers': 'Cache-Control',
+          }
+        }
+      );
+    }
+
     // Check authentication
     const user = getAuthUser(request);
     if (!user) {
