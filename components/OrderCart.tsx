@@ -12,11 +12,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { 
   ShoppingCart, Plus, Minus, Trash2, User, Hash, 
-  MessageSquare, CreditCard, CheckCircle, Loader2, Clock, History, Edit3, X
+  MessageSquare, CreditCard, CheckCircle, Loader2, Clock, History, Edit3, X,
+  Wifi, WifiOff, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { OrderItem, Order, OrderStatus, PaymentStatus } from '@/lib/orderTypes';
-import { useSocket } from '@/hooks/useSocket';
-import axios from 'axios';
+import { useOrderSync } from '@/hooks/useOrderSync';
 
 interface OrderCartProps {
   outletId: string;
@@ -24,26 +24,35 @@ interface OrderCartProps {
   onUpdateCart: (items: OrderItem[]) => void;
 }
 
-interface ActiveOrder {
-  order: Order;
-  canEdit: boolean;
-}
-
 export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCartProps) {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSubmitted, setOrderSubmitted] = useState(false);
-  const [submittedOrder, setSubmittedOrder] = useState<Order | null>(null);
-  const [activeOrder, setActiveOrder] = useState<ActiveOrder | null>(null);
-  const [orderHistory, setOrderHistory] = useState<Order[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [tableNumber, setTableNumber] = useState('');
   const [comments, setComments] = useState('');
-  const [isUpdatingOrder, setIsUpdatingOrder] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [editOrderItems, setEditOrderItems] = useState<OrderItem[]>([]);
-  const { socket, isConnected } = useSocket(outletId);
+
+  const {
+    activeOrder,
+    orderHistory,
+    isLoading,
+    connectionStatus,
+    isConnected,
+    createOrder,
+    updateOrder,
+    refreshOrder,
+    isOrderCompleted
+  } = useOrderSync({
+    outletId,
+    onOrderUpdate: (order) => {
+      console.log('Order updated:', order.orderId, order.orderStatus);
+    },
+    onOrderComplete: (order) => {
+      console.log('Order completed:', order.orderId);
+    }
+  });
 
   const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -51,108 +60,6 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
   // Helper function to check if order can be edited
   const canEditOrder = (orderStatus: OrderStatus, paymentStatus: PaymentStatus) => {
     return orderStatus === OrderStatus.TAKEN && paymentStatus === PaymentStatus.UNPAID;
-  };
-
-  // Helper function to check if order is completed
-  const isOrderCompleted = (orderStatus: OrderStatus, paymentStatus: PaymentStatus) => {
-    return orderStatus === OrderStatus.SERVED && paymentStatus === PaymentStatus.PAID;
-  };
-
-  // Load active order and history from localStorage on mount
-  useEffect(() => {
-    const savedActiveOrder = localStorage.getItem(`activeOrder-${outletId}`);
-    const savedHistory = localStorage.getItem(`orderHistory-${outletId}`);
-    
-    if (savedActiveOrder) {
-      try {
-        const parsedOrder = JSON.parse(savedActiveOrder);
-        const canEdit = canEditOrder(parsedOrder.orderStatus, parsedOrder.paymentStatus);
-        const isCompleted = isOrderCompleted(parsedOrder.orderStatus, parsedOrder.paymentStatus);
-        
-        if (isCompleted) {
-          // Move to history if completed
-          moveOrderToHistory(parsedOrder);
-        } else {
-          setActiveOrder({ order: parsedOrder, canEdit });
-        }
-      } catch (error) {
-        console.error('Error parsing active order:', error);
-        localStorage.removeItem(`activeOrder-${outletId}`);
-      }
-    }
-
-    if (savedHistory) {
-      try {
-        const parsedHistory = JSON.parse(savedHistory);
-        setOrderHistory(parsedHistory);
-      } catch (error) {
-        console.error('Error parsing order history:', error);
-        localStorage.removeItem(`orderHistory-${outletId}`);
-      }
-    }
-  }, [outletId]);
-
-  // Socket event listeners for real-time updates
-  useEffect(() => {
-    if (socket && outletId) {
-      console.log('Setting up socket listeners for outlet:', outletId);
-      
-      // Join outlet room for real-time updates
-      socket.emit('join-outlet', outletId);
-
-      // Listen for new orders (for managers)
-      socket.on('new-order', (order: Order) => {
-        console.log('Received new order:', order);
-        // This is mainly for the manager side
-      });
-
-      // Listen for order updates (for customers)
-      socket.on('order-updated', (updatedOrder: Order) => {
-        console.log('Received order update:', updatedOrder);
-        
-        if (activeOrder && updatedOrder.orderId === activeOrder.order.orderId) {
-          const canEdit = canEditOrder(updatedOrder.orderStatus, updatedOrder.paymentStatus);
-          const isCompleted = isOrderCompleted(updatedOrder.orderStatus, updatedOrder.paymentStatus);
-          
-          if (isCompleted) {
-            console.log('Order completed, moving to history');
-            moveOrderToHistory(updatedOrder);
-          } else {
-            console.log('Updating active order');
-            const newActiveOrder = { order: updatedOrder, canEdit };
-            setActiveOrder(newActiveOrder);
-            localStorage.setItem(`activeOrder-${outletId}`, JSON.stringify(updatedOrder));
-          }
-        }
-      });
-
-      // Listen for order completion
-      socket.on('order-completed', (completedOrder: Order) => {
-        console.log('Received order completion:', completedOrder);
-        
-        if (activeOrder && completedOrder.orderId === activeOrder.order.orderId) {
-          moveOrderToHistory(completedOrder);
-        }
-      });
-
-      return () => {
-        console.log('Cleaning up socket listeners');
-        socket.off('new-order');
-        socket.off('order-updated');
-        socket.off('order-completed');
-      };
-    }
-  }, [socket, activeOrder, outletId]);
-
-  const moveOrderToHistory = (order: Order) => {
-    console.log('Moving order to history:', order.orderId);
-    setOrderHistory(prev => {
-      const newHistory = [order, ...prev.filter(h => h.orderId !== order.orderId)];
-      localStorage.setItem(`orderHistory-${outletId}`, JSON.stringify(newHistory));
-      return newHistory;
-    });
-    setActiveOrder(null);
-    localStorage.removeItem(`activeOrder-${outletId}`);
   };
 
   const updateQuantity = (itemId: string, newQuantity: number) => {
@@ -184,33 +91,15 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
   const submitOrder = async () => {
     if (cartItems.length === 0) return;
 
-    setIsSubmitting(true);
     try {
-      const orderData = {
-        outletId,
+      const newOrder = await createOrder({
         items: cartItems,
         totalAmount,
         comments,
         customerName,
         tableNumber,
-      };
+      });
 
-      const response = await axios.post('/api/orders', orderData);
-      const newOrder = response.data.order;
-
-      console.log('Order submitted:', newOrder);
-
-      // Emit socket event for real-time update to manager
-      if (socket) {
-        socket.emit('new-order', newOrder);
-      }
-
-      // Save as active order
-      const canEdit = canEditOrder(newOrder.orderStatus, newOrder.paymentStatus);
-      setActiveOrder({ order: newOrder, canEdit });
-      localStorage.setItem(`activeOrder-${outletId}`, JSON.stringify(newOrder));
-
-      setSubmittedOrder(newOrder);
       setOrderSubmitted(true);
       clearCart();
       setIsCheckoutOpen(false);
@@ -219,10 +108,13 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
       setCustomerName('');
       setTableNumber('');
       setComments('');
+
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => {
+        setOrderSubmitted(false);
+      }, 3000);
     } catch (error) {
       console.error('Error submitting order:', error);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -245,34 +137,47 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
   const saveOrderEdit = async () => {
     if (!editingOrder || editOrderItems.length === 0) return;
 
-    setIsUpdatingOrder(true);
     try {
       const newTotalAmount = editOrderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       
-      // Update order via API
-      const response = await axios.put(`/api/orders/${editingOrder.orderId}`, {
+      await updateOrder(editingOrder.orderId, {
         items: editOrderItems,
         totalAmount: newTotalAmount,
       });
-
-      const updatedOrder = response.data.order;
-      console.log('Order updated:', updatedOrder);
-
-      // Emit socket event for real-time update
-      if (socket) {
-        socket.emit('order-updated', updatedOrder);
-      }
-
-      const canEdit = canEditOrder(updatedOrder.orderStatus, updatedOrder.paymentStatus);
-      setActiveOrder({ order: updatedOrder, canEdit });
-      localStorage.setItem(`activeOrder-${outletId}`, JSON.stringify(updatedOrder));
       
       setEditingOrder(null);
       setEditOrderItems([]);
     } catch (error) {
       console.error('Error updating order:', error);
-    } finally {
-      setIsUpdatingOrder(false);
+    }
+  };
+
+  const getStatusColor = (status: OrderStatus) => {
+    switch (status) {
+      case OrderStatus.TAKEN: return 'bg-blue-100 text-blue-800 border-blue-200';
+      case OrderStatus.PREPARING: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case OrderStatus.PREPARED: return 'bg-green-100 text-green-800 border-green-200';
+      case OrderStatus.SERVED: return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getPaymentColor = (status: PaymentStatus) => {
+    switch (status) {
+      case PaymentStatus.UNPAID: return 'bg-red-100 text-red-800 border-red-200';
+      case PaymentStatus.PAID: return 'bg-green-100 text-green-800 border-green-200';
+      case PaymentStatus.CANCELLED: return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusIcon = (status: OrderStatus) => {
+    switch (status) {
+      case OrderStatus.TAKEN: return <Clock className="h-4 w-4" />;
+      case OrderStatus.PREPARING: return <Loader2 className="h-4 w-4 animate-spin" />;
+      case OrderStatus.PREPARED: return <CheckCircle className="h-4 w-4" />;
+      case OrderStatus.SERVED: return <CheckCircle className="h-4 w-4" />;
+      default: return <Clock className="h-4 w-4" />;
     }
   };
 
@@ -283,60 +188,38 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
     return null;
   }
 
-  if (orderSubmitted && submittedOrder) {
-    return (
-      <Dialog open={true} onOpenChange={() => setOrderSubmitted(false)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-            <DialogTitle className="text-xl font-bold text-green-600">
-              Order Confirmed!
-            </DialogTitle>
-            <DialogDescription>
-              Your order has been successfully placed
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="text-center">
-              <p className="text-sm text-gray-600">Order ID</p>
-              <p className="text-lg font-mono font-bold">{submittedOrder.orderId}</p>
-            </div>
-            
-            <Separator />
-            
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Total Amount:</span>
-                <span className="font-bold">₹{submittedOrder.totalAmount.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Status:</span>
-                <Badge variant="secondary">{submittedOrder.orderStatus}</Badge>
-              </div>
-              <div className="flex justify-between">
-                <span>Payment:</span>
-                <Badge variant="outline">{submittedOrder.paymentStatus}</Badge>
-              </div>
-            </div>
-            
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <p className="text-sm text-blue-800">
-                Your order is being prepared. You can track its progress below!
-              </p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   return (
     <>
-      {/* History Button in Navigation */}
-      {orderHistory.length > 0 && (
+      {/* Connection Status Indicator */}
+      <div className="fixed top-4 right-4 z-50">
+        <div className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-medium ${
+          connectionStatus === 'connected' 
+            ? 'bg-green-100 text-green-800' 
+            : connectionStatus === 'reconnecting'
+            ? 'bg-yellow-100 text-yellow-800'
+            : 'bg-red-100 text-red-800'
+        }`}>
+          {connectionStatus === 'connected' ? (
+            <>
+              <Wifi className="h-4 w-4" />
+              <span>Live</span>
+            </>
+          ) : connectionStatus === 'reconnecting' ? (
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span>Reconnecting</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="h-4 w-4" />
+              <span>Offline</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* History Button */}
+      {(orderHistory.length > 0 || activeOrder) && (
         <div className="fixed top-20 right-4 z-40">
           <Button
             onClick={() => setShowHistory(true)}
@@ -345,7 +228,7 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
             className="bg-white shadow-md border-gray-300"
           >
             <History className="h-4 w-4 mr-2" />
-            History ({orderHistory.length})
+            {activeOrder ? 'Track Order' : `History (${orderHistory.length})`}
           </Button>
         </div>
       )}
@@ -354,41 +237,53 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
       <div className="fixed bottom-4 left-4 right-4 z-50">
         {activeOrder ? (
           <Card className="shadow-lg border-2 bg-white" style={{
-            borderColor: activeOrder.order.orderStatus === OrderStatus.TAKEN ? '#f59e0b' : 
-                        activeOrder.order.orderStatus === OrderStatus.PREPARING ? '#3b82f6' :
-                        activeOrder.order.orderStatus === OrderStatus.PREPARED ? '#10b981' : '#6b7280'
+            borderColor: activeOrder.orderStatus === OrderStatus.TAKEN ? '#f59e0b' : 
+                        activeOrder.orderStatus === OrderStatus.PREPARING ? '#3b82f6' :
+                        activeOrder.orderStatus === OrderStatus.PREPARED ? '#10b981' : '#6b7280'
           }}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="relative">
-                    <Clock className="h-6 w-6" style={{
-                      color: activeOrder.order.orderStatus === OrderStatus.TAKEN ? '#f59e0b' : 
-                            activeOrder.order.orderStatus === OrderStatus.PREPARING ? '#3b82f6' :
-                            activeOrder.order.orderStatus === OrderStatus.PREPARED ? '#10b981' : '#6b7280'
-                    }} />
+                    {getStatusIcon(activeOrder.orderStatus)}
                     {/* Connection indicator */}
-                    <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                    <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${
+                      isConnected ? 'bg-green-500' : 'bg-red-500'
+                    }`} />
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900">Order {activeOrder.order.orderId.split('-')[1]}</p>
+                    <p className="font-semibold text-gray-900">
+                      Order {activeOrder.orderId.split('-')[1]}
+                    </p>
                     <div className="flex items-center space-x-2">
-                      <Badge variant="secondary" className="text-xs">
-                        {activeOrder.order.orderStatus}
+                      <Badge variant="secondary" className={`text-xs ${getStatusColor(activeOrder.orderStatus)}`}>
+                        {activeOrder.orderStatus}
                       </Badge>
                       <Badge variant="outline" className="text-xs">
-                        ₹{activeOrder.order.totalAmount.toFixed(2)}
+                        ₹{activeOrder.totalAmount.toFixed(2)}
                       </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {activeOrder.order.paymentStatus}
+                      <Badge variant="outline" className={`text-xs ${getPaymentColor(activeOrder.paymentStatus)}`}>
+                        {activeOrder.paymentStatus}
                       </Badge>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  {activeOrder.canEdit && (
+                  {!isConnected && (
                     <Button
-                      onClick={() => handleEditOrder(activeOrder.order)}
+                      onClick={refreshOrder}
+                      size="sm"
+                      variant="outline"
+                      className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                      disabled={isLoading}
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+                      Sync
+                    </Button>
+                  )}
+                  {canEditOrder(activeOrder.orderStatus, activeOrder.paymentStatus) && (
+                    <Button
+                      onClick={() => handleEditOrder(activeOrder)}
                       size="sm"
                       variant="outline"
                       className="border-orange-300 text-orange-600 hover:bg-orange-50"
@@ -406,6 +301,18 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                   </Button>
                 </div>
               </div>
+              
+              {/* Show offline warning */}
+              {!isConnected && (
+                <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="h-4 w-4 text-yellow-600" />
+                    <p className="text-xs text-yellow-800">
+                      Connection lost. Order updates may be delayed.
+                    </p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -424,14 +331,69 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                     <p className="text-sm text-gray-600">{totalItems} items</p>
                   </div>
                 </div>
-                <Button onClick={handleCheckout} className="bg-orange-600 hover:bg-orange-700 text-white">
-                  Checkout
+                <Button 
+                  onClick={handleCheckout} 
+                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                  disabled={!isConnected}
+                >
+                  {!isConnected ? 'Offline' : 'Checkout'}
                 </Button>
               </div>
             </CardContent>
           </Card>
         )}
       </div>
+
+      {/* Success Dialog */}
+      <Dialog open={orderSubmitted} onOpenChange={setOrderSubmitted}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <DialogTitle className="text-xl font-bold text-green-600">
+              Order Confirmed!
+            </DialogTitle>
+            <DialogDescription>
+              Your order has been successfully placed and is being processed
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {activeOrder && (
+              <>
+                <div className="text-center">
+                  <p className="text-sm text-gray-600">Order ID</p>
+                  <p className="text-lg font-mono font-bold">{activeOrder.orderId}</p>
+                </div>
+                
+                <Separator />
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Total Amount:</span>
+                    <span className="font-bold">₹{activeOrder.totalAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Status:</span>
+                    <Badge variant="secondary">{activeOrder.orderStatus}</Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Payment:</span>
+                    <Badge variant="outline">{activeOrder.paymentStatus}</Badge>
+                  </div>
+                </div>
+              </>
+            )}
+            
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <p className="text-sm text-blue-800">
+                Your order is being prepared. You can track its progress in real-time!
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Checkout Drawer */}
       <Drawer open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
@@ -448,6 +410,18 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
 
           <div className="px-4 pb-6 overflow-y-auto">
             <div className="space-y-6">
+              {/* Connection Warning */}
+              {!isConnected && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="flex items-center space-x-2">
+                    <WifiOff className="h-4 w-4 text-yellow-600" />
+                    <p className="text-sm text-yellow-800">
+                      You're currently offline. Order will be submitted when connection is restored.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Order Items */}
               <div className="space-y-3">
                 <h3 className="font-semibold">Order Items</h3>
@@ -562,10 +536,10 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                 </Button>
                 <Button
                   onClick={submitOrder}
-                  disabled={isSubmitting || cartItems.length === 0}
+                  disabled={isLoading || cartItems.length === 0}
                   className="flex-1 bg-orange-600 hover:bg-orange-700"
                 >
-                  {isSubmitting ? (
+                  {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Placing Order...
@@ -660,10 +634,10 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                 </Button>
                 <Button
                   onClick={saveOrderEdit}
-                  disabled={isUpdatingOrder || editOrderItems.length === 0}
+                  disabled={isLoading || editOrderItems.length === 0}
                   className="flex-1 bg-orange-600 hover:bg-orange-700"
                 >
-                  {isUpdatingOrder ? (
+                  {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Updating...
@@ -681,16 +655,16 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
         </DrawerContent>
       </Drawer>
 
-      {/* Order History Drawer */}
+      {/* Order History/Tracking Drawer */}
       <Drawer open={showHistory} onOpenChange={setShowHistory}>
         <DrawerContent className="max-h-[90vh]">
           <DrawerHeader>
             <DrawerTitle className="flex items-center">
               <History className="h-5 w-5 mr-2" />
-              {activeOrder ? 'Current Order' : 'Order History'}
+              {activeOrder ? 'Order Tracking' : 'Order History'}
             </DrawerTitle>
             <DrawerDescription>
-              {activeOrder ? 'Track your current order status' : 'View your previous orders'}
+              {activeOrder ? 'Track your current order status in real-time' : 'View your previous orders'}
             </DrawerDescription>
           </DrawerHeader>
 
@@ -699,29 +673,53 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
               {/* Current Active Order */}
               {activeOrder && (
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-green-600">Current Order</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-green-600">Current Order</h3>
+                    <div className="flex items-center space-x-2">
+                      {isConnected ? (
+                        <div className="flex items-center space-x-1 text-green-600">
+                          <Wifi className="h-4 w-4" />
+                          <span className="text-xs">Live</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-1 text-red-600">
+                          <WifiOff className="h-4 w-4" />
+                          <span className="text-xs">Offline</span>
+                        </div>
+                      )}
+                      <Button
+                        onClick={refreshOrder}
+                        size="sm"
+                        variant="outline"
+                        disabled={isLoading}
+                      >
+                        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                      </Button>
+                    </div>
+                  </div>
+                  
                   <Card className="border-green-200">
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <p className="font-semibold">{activeOrder.order.orderId}</p>
+                          <p className="font-semibold">{activeOrder.orderId}</p>
                           <p className="text-sm text-gray-600">
-                            {new Date(activeOrder.order.timestamps.created).toLocaleString()}
+                            {new Date(activeOrder.timestamps.created).toLocaleString()}
                           </p>
                         </div>
                         <div className="text-right">
-                          <Badge variant="secondary" className="mb-1">
-                            {activeOrder.order.orderStatus}
+                          <Badge variant="secondary" className={`mb-1 ${getStatusColor(activeOrder.orderStatus)}`}>
+                            {activeOrder.orderStatus}
                           </Badge>
-                          <Badge variant="outline" className="mb-1 ml-1">
-                            {activeOrder.order.paymentStatus}
+                          <Badge variant="outline" className={`mb-1 ml-1 ${getPaymentColor(activeOrder.paymentStatus)}`}>
+                            {activeOrder.paymentStatus}
                           </Badge>
-                          <p className="font-bold">₹{activeOrder.order.totalAmount.toFixed(2)}</p>
+                          <p className="font-bold">₹{activeOrder.totalAmount.toFixed(2)}</p>
                         </div>
                       </div>
                       
                       <div className="space-y-2">
-                        {activeOrder.order.items.map((item, index) => (
+                        {activeOrder.items.map((item, index) => (
                           <div key={index} className="flex justify-between text-sm">
                             <span>{item.quantity}x {item.name}</span>
                             <span>₹{(item.quantity * item.price).toFixed(2)}</span>
@@ -729,9 +727,9 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                         ))}
                       </div>
 
-                      {activeOrder.canEdit && (
+                      {canEditOrder(activeOrder.orderStatus, activeOrder.paymentStatus) && (
                         <Button
-                          onClick={() => handleEditOrder(activeOrder.order)}
+                          onClick={() => handleEditOrder(activeOrder)}
                           size="sm"
                           className="w-full mt-3 bg-orange-600 hover:bg-orange-700"
                         >
@@ -739,6 +737,29 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                           Edit Order
                         </Button>
                       )}
+
+                      {/* Order Progress */}
+                      <div className="mt-4 pt-4 border-t">
+                        <h4 className="text-sm font-medium mb-3">Order Progress</h4>
+                        <div className="space-y-2">
+                          {Object.values(OrderStatus).map((status, index) => {
+                            const isCompleted = Object.values(OrderStatus).indexOf(activeOrder.orderStatus) >= index;
+                            const isCurrent = activeOrder.orderStatus === status;
+                            
+                            return (
+                              <div key={status} className={`flex items-center space-x-3 ${
+                                isCompleted ? 'text-green-600' : 'text-gray-400'
+                              }`}>
+                                <div className={`w-3 h-3 rounded-full ${
+                                  isCompleted ? 'bg-green-600' : 'bg-gray-300'
+                                } ${isCurrent ? 'animate-pulse' : ''}`} />
+                                <span className="text-sm capitalize">{status}</span>
+                                {isCurrent && <span className="text-xs">(Current)</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
