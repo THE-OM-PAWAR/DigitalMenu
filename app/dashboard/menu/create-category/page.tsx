@@ -799,7 +799,7 @@ export default function CreateCategoryPage() {
               Delete Category
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{selectedCategory?.name}"? 
+              Are you sure you want to delete "{selectedCategory?.name || "No Value"}"? 
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

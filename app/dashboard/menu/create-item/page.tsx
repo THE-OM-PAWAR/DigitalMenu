@@ -548,7 +548,7 @@ export default function CreateItemPage() {
   const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.categoryId.name.toLowerCase().includes(searchQuery.toLowerCase())
+    item.categoryId?.name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading || isLoading) {
@@ -962,7 +962,7 @@ export default function CreateItemPage() {
                       {item.name}
                     </h3>
                     <Badge variant="secondary" className="ml-2 text-xs">
-                      {item.categoryId.name}
+                      {item.categoryId?.name || "No Category"}
                     </Badge>
                   </div>
                   
@@ -974,7 +974,7 @@ export default function CreateItemPage() {
                   <div className="space-y-1">
                     {item.quantityPrices.map((qp, index) => (
                       <div key={index} className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">{qp.quantityId.value}</span>
+                        <span className="text-gray-600">{qp.quantityId?.value || "No Value"}</span>
                         <span className="font-semibold text-gray-900">₹{qp.price.toFixed(2)}</span>
                       </div>
                     ))}
