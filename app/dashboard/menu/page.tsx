@@ -141,20 +141,22 @@ export default function MenuManagementPage() {
             </Card>
           </Link>
 
-          <Card className="group hover:shadow-md transition-all duration-300 cursor-pointer border-0 shadow-sm flex flex-row items-center px-6 py-6 w-full">
-            <div className="w-16 h-16 mr-6 bg-gray-100 rounded-2xl flex items-center justify-center group-hover:bg-gray-200 transition-colors">
-              {/* You can use an icon here if you want, e.g., <Palette className="h-8 w-8 text-gray-700" /> */}
-              <Palette className="h-8 w-8 text-gray-700" />
-            </div>
-            <div className="flex flex-col flex-1">
-              <CardTitle className="text-lg font-semibold text-gray-900">
-                Change Theme
-              </CardTitle>
-              <CardDescription className="text-gray-600 text-sm mt-2">
-                Customize your menu's appearance
-              </CardDescription>
-            </div>
-          </Card>
+          {/* Change Theme */}
+          <Link href="/dashboard/menu/theme" className="w-full">
+            <Card className="group hover:shadow-md transition-all duration-300 cursor-pointer border-0 shadow-sm flex flex-row items-center px-6 py-6 w-full">
+              <div className="w-16 h-16 mr-6 bg-purple-100 rounded-2xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                <Palette className="h-8 w-8 text-purple-600" />
+              </div>
+              <div className="flex flex-col flex-1">
+                <CardTitle className="text-lg font-semibold text-gray-900">
+                  Change Theme
+                </CardTitle>
+                <CardDescription className="text-gray-600 text-sm mt-2">
+                  Customize your menu's appearance
+                </CardDescription>
+              </div>
+            </Card>
+          </Link>
         </div>
       </div>
     </div>

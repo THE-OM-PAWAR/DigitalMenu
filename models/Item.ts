@@ -15,6 +15,7 @@ export interface IItem extends Document {
   isVeg: boolean;
   quantityPrices: IItemQuantityPrice[];
   isAvailable: boolean;
+  isHighlighted: boolean;
   sortOrder: number;
   isActive: boolean;
   createdAt: Date;
@@ -77,6 +78,10 @@ const ItemSchema = new Schema<IItem>({
   isAvailable: {
     type: Boolean,
     default: true,
+  },
+  isHighlighted: {
+    type: Boolean,
+    default: false,
   },
   sortOrder: {
     type: Number,
