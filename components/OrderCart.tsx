@@ -811,7 +811,7 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
             </div>
           </div>
         </DrawerContent>
-      </Drawer>
+      </Drawer> 
     </>
   );
 }
