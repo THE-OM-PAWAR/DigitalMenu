@@ -13,7 +13,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, Dr
 import { 
   ShoppingCart, Plus, Minus, Trash2, User, Hash, 
   MessageSquare, CreditCard, CheckCircle, Loader2, Clock, History, Edit3, X,
-  Wifi, WifiOff, RefreshCw, AlertCircle, Zap
+  Wifi, WifiOff, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { OrderItem, Order, OrderStatus, PaymentStatus } from '@/lib/orderTypes';
 import { useOrderSync } from '@/hooks/useOrderSync';
@@ -43,8 +43,7 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
     createOrder,
     updateOrder,
     refreshOrder,
-    isOrderCompleted,
-    isPollingMode
+    isOrderCompleted
   } = useOrderSync({
     outletId,
     onOrderUpdate: (order) => {
@@ -195,29 +194,20 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
       <div className="fixed top-4 right-4 z-50">
         <div className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-medium ${
           connectionStatus === 'connected' 
-            ? isPollingMode 
-              ? 'bg-blue-100 text-blue-800' 
-              : 'bg-green-100 text-green-800'
+            ? 'bg-green-100 text-green-800' 
             : connectionStatus === 'reconnecting'
             ? 'bg-yellow-100 text-yellow-800'
             : 'bg-red-100 text-red-800'
         }`}>
           {connectionStatus === 'connected' ? (
-            isPollingMode ? (
-              <>
-                <Zap className="h-4 w-4" />
-                <span>Sync</span>
-              </>
-            ) : (
-              <>
-                <Wifi className="h-4 w-4" />
-                <span>Live</span>
-              </>
-            )
+            <>
+              <Wifi className="h-4 w-4" />
+              <span>Live</span>
+            </>
           ) : connectionStatus === 'reconnecting' ? (
             <>
               <RefreshCw className="h-4 w-4 animate-spin" />
-              <span>Connecting</span>
+              <span>Reconnecting</span>
             </>
           ) : (
             <>
@@ -258,11 +248,7 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                     {getStatusIcon(activeOrder.orderStatus)}
                     {/* Connection indicator */}
                     <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full ${
-                      isConnected 
-                        ? isPollingMode 
-                          ? 'bg-blue-500' 
-                          : 'bg-green-500' 
-                        : 'bg-red-500'
+                      isConnected ? 'bg-green-500' : 'bg-red-500'
                     }`} />
                   </div>
                   <div>
@@ -316,18 +302,6 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                 </div>
               </div>
               
-              {/* Show connection mode info */}
-              {isPollingMode && (
-                <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <Zap className="h-4 w-4 text-blue-600" />
-                    <p className="text-xs text-blue-800">
-                      Using sync mode for real-time updates
-                    </p>
-                  </div>
-                </div>
-              )}
-              
               {/* Show offline warning */}
               {!isConnected && (
                 <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -360,9 +334,9 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                 <Button 
                   onClick={handleCheckout} 
                   className="bg-orange-600 hover:bg-orange-700 text-white"
-                  disabled={!isConnected && !isPollingMode}
+                  disabled={!isConnected}
                 >
-                  {!isConnected && !isPollingMode ? 'Offline' : 'Checkout'}
+                  {!isConnected ? 'Offline' : 'Checkout'}
                 </Button>
               </div>
             </CardContent>
@@ -437,24 +411,12 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
           <div className="px-4 pb-6 overflow-y-auto">
             <div className="space-y-6">
               {/* Connection Warning */}
-              {!isConnected && !isPollingMode && (
+              {!isConnected && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                   <div className="flex items-center space-x-2">
                     <WifiOff className="h-4 w-4 text-yellow-600" />
                     <p className="text-sm text-yellow-800">
                       You're currently offline. Order will be submitted when connection is restored.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Polling Mode Info */}
-              {isPollingMode && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <div className="flex items-center space-x-2">
-                    <Zap className="h-4 w-4 text-blue-600" />
-                    <p className="text-sm text-blue-800">
-                      Using sync mode for reliable order processing.
                     </p>
                   </div>
                 </div>
@@ -574,7 +536,7 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                 </Button>
                 <Button
                   onClick={submitOrder}
-                  disabled={isLoading || cartItems.length === 0 || (!isConnected && !isPollingMode)}
+                  disabled={isLoading || cartItems.length === 0}
                   className="flex-1 bg-orange-600 hover:bg-orange-700"
                 >
                   {isLoading ? (
@@ -716,8 +678,8 @@ export default function OrderCart({ outletId, cartItems, onUpdateCart }: OrderCa
                     <div className="flex items-center space-x-2">
                       {isConnected ? (
                         <div className="flex items-center space-x-1 text-green-600">
-                          {isPollingMode ? <Zap className="h-4 w-4" /> : <Wifi className="h-4 w-4" />}
-                          <span className="text-xs">{isPollingMode ? 'Sync' : 'Live'}</span>
+                          <Wifi className="h-4 w-4" />
+                          <span className="text-xs">Live</span>
                         </div>
                       ) : (
                         <div className="flex items-center space-x-1 text-red-600">
