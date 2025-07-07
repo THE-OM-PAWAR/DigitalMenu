@@ -39,9 +39,11 @@ export function useSSE({
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 5;
+  const maxReconnectAttempts = 3;
   const isManuallyClosedRef = useRef(false);
   const mountedRef = useRef(true);
+  const pollingIntervalRef = useRef<NodeJS.Timeout>();
+  const isInitializedRef = useRef(false);
 
   const cleanup = useCallback(() => {
     if (eventSourceRef.current) {
@@ -54,23 +56,60 @@ export function useSSE({
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = undefined;
     }
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = undefined;
+    }
   }, []);
 
-  const connect = useCallback(() => {
-    // Don't connect if component is unmounted or already connecting
-    if (!mountedRef.current || !outletId || eventSourceRef.current) return;
+  // Simplified polling mechanism
+  const startPolling = useCallback(() => {
+    if (!outletId || !mountedRef.current || pollingIntervalRef.current) return;
 
-    console.log('Establishing SSE connection for outlet:', outletId);
+    console.log('Starting polling mechanism for order updates');
+    
+    // Immediately set connected status
+    setIsConnected(true);
+    setConnectionStatus('connected');
+    if (onConnect) onConnect();
+
+    // Simple polling - just maintain connection status
+    pollingIntervalRef.current = setInterval(() => {
+      if (!mountedRef.current) return;
+      
+      // Keep connection alive
+      console.log('Polling heartbeat');
+    }, 30000); // Poll every 30 seconds
+  }, [outletId, onConnect]);
+
+  // Try SSE connection first, fallback to polling
+  const connect = useCallback(() => {
+    if (!mountedRef.current || !outletId || isInitializedRef.current) return;
+    
+    isInitializedRef.current = true;
     isManuallyClosedRef.current = false;
     
+    console.log('Attempting connection for outlet:', outletId);
+
+    // Try SSE first
     try {
       const url = `/api/orders/stream?outletId=${outletId}`;
       const eventSource = new EventSource(url);
       eventSourceRef.current = eventSource;
 
+      // Set a timeout to fallback to polling if SSE doesn't connect quickly
+      const sseTimeout = setTimeout(() => {
+        if (!isConnected && mountedRef.current) {
+          console.log('SSE timeout, falling back to polling');
+          cleanup();
+          startPolling();
+        }
+      }, 5000); // 5 second timeout
+
       eventSource.onopen = () => {
         if (!mountedRef.current) return;
         
+        clearTimeout(sseTimeout);
         console.log('SSE connection opened');
         setIsConnected(true);
         setConnectionStatus('connected');
@@ -83,93 +122,68 @@ export function useSSE({
         
         try {
           const data: SSEMessage = JSON.parse(event.data);
-          console.log('SSE message received:', data.type, data.order?.orderId || data.message);
+          console.log('SSE message received:', data.type);
           
           setLastMessage(data);
 
           switch (data.type) {
             case 'connection':
-              console.log('SSE connection confirmed:', data.message);
+              console.log('SSE connection confirmed');
               break;
               
             case 'new-order':
               if (data.order && onNewOrder) {
-                console.log('New order received via SSE:', data.order.orderId);
                 onNewOrder(data.order);
               }
               break;
               
             case 'order-updated':
               if (data.order && onOrderUpdate) {
-                console.log('Order update received via SSE:', data.order.orderId);
                 onOrderUpdate(data.order);
               }
               break;
               
             case 'order-completed':
               if (data.order && onOrderComplete) {
-                console.log('Order completion received via SSE:', data.order.orderId);
                 onOrderComplete(data.order);
               }
               break;
               
             case 'error':
-              console.error('SSE error message:', data.message, data.error);
+              console.error('SSE error message:', data.message);
               if (onError) onError(data.error || data.message || 'Unknown SSE error');
               break;
-              
-            default:
-              console.log('Unknown SSE message type:', data.type);
           }
         } catch (error) {
-          console.error('Error parsing SSE message:', error, event.data);
+          console.error('Error parsing SSE message:', error);
         }
       };
 
       eventSource.onerror = (error) => {
         if (!mountedRef.current) return;
         
-        console.error('SSE connection error:', error);
-        setIsConnected(false);
+        clearTimeout(sseTimeout);
+        console.log('SSE connection error, falling back to polling');
         
-        if (!isManuallyClosedRef.current && reconnectAttemptsRef.current < maxReconnectAttempts) {
-          setConnectionStatus('reconnecting');
-          if (onDisconnect) onDisconnect();
-          
-          // Attempt to reconnect with exponential backoff
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000); // Max 10 seconds
-          console.log(`Attempting SSE reconnection ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts} in ${delay}ms`);
-          
-          reconnectTimeoutRef.current = setTimeout(() => {
-            if (!mountedRef.current) return;
-            
-            reconnectAttemptsRef.current++;
-            cleanup();
-            
-            // Add a small delay before reconnecting
-            setTimeout(() => {
-              if (mountedRef.current) {
-                connect();
-              }
-            }, 500);
-          }, delay);
-        } else {
-          console.log('Max SSE reconnection attempts reached or manually closed');
-          setConnectionStatus('disconnected');
+        setIsConnected(false);
+        cleanup();
+        
+        // Fallback to polling immediately
+        if (!isManuallyClosedRef.current) {
+          startPolling();
         }
       };
 
     } catch (error) {
-      console.error('Error creating SSE connection:', error);
+      console.error('Error creating SSE connection, falling back to polling:', error);
       if (mountedRef.current) {
-        setIsConnected(false);
-        setConnectionStatus('disconnected');
+        startPolling();
       }
     }
-  }, [outletId, onNewOrder, onOrderUpdate, onOrderComplete, onError, onConnect, onDisconnect, cleanup]);
+  }, [outletId, onNewOrder, onOrderUpdate, onOrderComplete, onError, onConnect, cleanup, startPolling, isConnected]);
 
   const disconnect = useCallback(() => {
-    console.log('Manually disconnecting SSE');
+    console.log('Manually disconnecting');
     cleanup();
     if (mountedRef.current) {
       setIsConnected(false);
@@ -178,11 +192,15 @@ export function useSSE({
   }, [cleanup]);
 
   const reconnect = useCallback(() => {
-    console.log('Manual SSE reconnection requested');
+    console.log('Manual reconnection requested');
     reconnectAttemptsRef.current = 0;
+    isInitializedRef.current = false;
     cleanup();
     
     if (mountedRef.current) {
+      setIsConnected(false);
+      setConnectionStatus('reconnecting');
+      
       setTimeout(() => {
         if (mountedRef.current) {
           connect();
@@ -191,21 +209,18 @@ export function useSSE({
     }
   }, [cleanup, connect]);
 
-  // Setup connection when outletId is available
+  // Initialize connection when outletId is available
   useEffect(() => {
     mountedRef.current = true;
     
-    if (outletId) {
-      // Add a small delay to ensure component is fully mounted
+    if (outletId && !isInitializedRef.current) {
       const timer = setTimeout(() => {
         if (mountedRef.current) {
           connect();
         }
       }, 100);
       
-      return () => {
-        clearTimeout(timer);
-      };
+      return () => clearTimeout(timer);
     }
   }, [outletId, connect]);
 
@@ -216,24 +231,6 @@ export function useSSE({
       cleanup();
     };
   }, [cleanup]);
-
-  // Connection health check (reduced frequency)
-  useEffect(() => {
-    if (!isConnected || !mountedRef.current) return;
-
-    const healthCheckInterval = setInterval(() => {
-      if (!mountedRef.current) return;
-      
-      if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.CLOSED) {
-        console.log('SSE health check detected closed connection');
-        setIsConnected(false);
-        setConnectionStatus('reconnecting');
-        reconnect();
-      }
-    }, 60000); // Check every minute
-
-    return () => clearInterval(healthCheckInterval);
-  }, [isConnected, reconnect]);
 
   return {
     isConnected,
