@@ -18,6 +18,15 @@ import OrderCart from '@/components/OrderCart';
 import { OrderItem } from '@/lib/orderTypes';
 import axios from 'axios';
 
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    // Use window.location.origin as base URL in the browser
+    return window.location.origin + '/api';
+  }
+  // Default to localhost for server-side or fallback
+  return 'http://localhost:3000/api';
+};
+
 interface Outlet {
   _id: string;
   name: string;
@@ -109,10 +118,10 @@ export default function PublicMenuPage() {
       }
 
       const requests = [
-        axios.get(`/api/public/outlets/${outletId}`),
-        axios.get(`/api/public/categories?outletId=${outletId}`),
-        axios.get(`/api/public/items?outletId=${outletId}`),
-        axios.get(`/api/public/items/highlighted?outletId=${outletId}`)
+        axios.get(`${getApiBaseUrl()}/api/public/outlets/${outletId}`),
+        axios.get(`${getApiBaseUrl()}/api/public/categories?outletId=${outletId}`),
+        axios.get(`${getApiBaseUrl()}/api/public/items?outletId=${outletId}`),
+        axios.get(`${getApiBaseUrl()}/api/public/items/highlighted?outletId=${outletId}`)
       ];
 
       const [outletResponse, categoriesResponse, itemsResponse, highlightedResponse] = await Promise.all(
