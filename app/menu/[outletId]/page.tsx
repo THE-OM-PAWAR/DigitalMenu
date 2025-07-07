@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, Dr
 import { Separator } from '@/components/ui/separator';
 import { 
   Store, Search, Leaf, Beef, MapPin, Phone, 
-  ChefHat, Utensils, Star, Clock, Grid3X3, Plus, Minus, ShoppingCart, History, Wifi, WifiOff
+  ChefHat, Utensils, Star, Clock, Grid3X3, Plus, Minus, ShoppingCart, History, Wifi, WifiOff, RefreshCw
 } from 'lucide-react';
 import ThemeProvider from '@/components/ThemeProvider';
 import OrderCart from '@/components/OrderCart';
@@ -66,16 +66,24 @@ export default function PublicMenuPage() {
   const [highlightedItems, setHighlightedItems] = useState<Item[]>([]);
   const [cartItems, setCartItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPolling, setIsPolling] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'online' | 'offline'>('online');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [error, setError] = useState<string>('');
 
+  // Refs for cleanup
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isComponentMountedRef = useRef(true);
+
   useEffect(() => {
-    if (outletId) {
-      fetchMenuData();
-    }
-  }, [outletId]);
+    isComponentMountedRef.current = true;
+    return () => {
+      isComponentMountedRef.current = false;
+    };
+  }, []);
 
   // Load cart from localStorage on component mount
   useEffect(() => {
@@ -98,10 +106,75 @@ export default function PublicMenuPage() {
     }
   }, [cartItems, outletId]);
 
-  const fetchMenuData = async () => {
+  // Main effect for fetching data and setting up polling
+  useEffect(() => {
+    if (outletId) {
+      // Initial fetch
+      fetchMenuData();
+      
+      // Set up polling interval
+      const intervalId = setInterval(() => {
+        if (isComponentMountedRef.current) {
+          fetchMenuData(true); // Pass true to indicate this is a polling request
+        }
+      }, 10000); // Poll every 10 seconds
+      
+      pollingIntervalRef.current = intervalId;
+      
+      // Cleanup function
+      return () => {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+      };
+    }
+  }, [outletId]);
+
+  // Handle visibility change to pause/resume polling when tab is not visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Tab is hidden, clear polling
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        setIsPolling(false);
+      } else {
+        // Tab is visible, resume polling if we have an outletId
+        if (outletId && !pollingIntervalRef.current) {
+          const intervalId = setInterval(() => {
+            if (isComponentMountedRef.current) {
+              fetchMenuData(true);
+            }
+          }, 10000);
+          pollingIntervalRef.current = intervalId;
+          setIsPolling(true);
+          
+          // Fetch immediately when tab becomes visible
+          fetchMenuData(true);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [outletId]);
+
+  const fetchMenuData = async (isPollingRequest = false) => {
     try {
-      setIsLoading(true);
+      if (!isPollingRequest) {
+        setIsLoading(true);
+      } else {
+        setIsPolling(true);
+      }
+      
       setError('');
+      setConnectionStatus('online');
 
       if (!outletId || outletId.length !== 24) {
         setError('Invalid outlet ID format');
@@ -124,22 +197,49 @@ export default function PublicMenuPage() {
         )
       );
 
-      setOutlet(outletResponse.data.outlet);
-      setCategories(categoriesResponse.data.categories || []);
-      setItems(itemsResponse.data.items || []);
-      setHighlightedItems(highlightedResponse.data.items || []);
+      // Only update state if component is still mounted
+      if (isComponentMountedRef.current) {
+        setOutlet(outletResponse.data.outlet);
+        setCategories(categoriesResponse.data.categories || []);
+        setItems(itemsResponse.data.items || []);
+        setHighlightedItems(highlightedResponse.data.items || []);
+        setLastUpdateTime(new Date());
+        
+        // Log successful polling update
+        if (isPollingRequest) {
+          console.log('Menu data updated via polling at:', new Date().toLocaleTimeString());
+        }
+      }
     } catch (error: any) {
       console.error('Error fetching menu data:', error);
-      if (error.response?.status === 404) {
-        setError('Menu not found');
-      } else if (error.response?.status === 400) {
-        setError('Invalid outlet ID');
-      } else {
-        setError('Failed to load menu. Please try again later.');
+      
+      if (isComponentMountedRef.current) {
+        setConnectionStatus('offline');
+        
+        if (error.response?.status === 404) {
+          setError('Menu not found');
+        } else if (error.response?.status === 400) {
+          setError('Invalid outlet ID');
+        } else {
+          // For polling requests, don't show error to user, just log it
+          if (!isPollingRequest) {
+            setError('Failed to load menu. Please try again later.');
+          }
+        }
       }
     } finally {
-      setIsLoading(false);
+      if (isComponentMountedRef.current) {
+        if (!isPollingRequest) {
+          setIsLoading(false);
+        } else {
+          setIsPolling(false);
+        }
+      }
     }
+  };
+
+  const handleManualRefresh = () => {
+    fetchMenuData();
   };
 
   const addToCart = (item: Item, quantityPrice: { quantityId: { _id: string; value: string; description: string }; price: number }) => {
@@ -223,7 +323,7 @@ export default function PublicMenuPage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Oops!</h1>
           <p className="text-gray-600 mb-6">{error}</p>
           <Button 
-            onClick={fetchMenuData}
+            onClick={handleManualRefresh}
             className="bg-gray-900 hover:bg-gray-800"
           >
             Try Again
@@ -272,54 +372,90 @@ export default function PublicMenuPage() {
                   <div className="flex items-center text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
                     <Star className="h-3 w-3 mr-1" style={{ color: 'var(--theme-accent)' }} />
                     <span>4.8 • Open now</span>
+                    {lastUpdateTime && (
+                      <span className="ml-2 text-xs opacity-75">
+                        • Updated {lastUpdateTime.toLocaleTimeString()}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Right - Location Button */}
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center space-x-1" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}>
-                    <MapPin className="h-4 w-4" />
-                    <span className="hidden sm:inline">Location</span>
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-80" style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}>
-                  <SheetHeader>
-                    <SheetTitle style={{ color: 'var(--theme-text)' }}>Location & Contact</SheetTitle>
-                    <SheetDescription style={{ color: 'var(--theme-text-secondary)' }}>
-                      Find us and get in touch
-                    </SheetDescription>
-                  </SheetHeader>
-                  <div className="mt-6 space-y-4">
-                    {outlet.address && (
-                      <div className="flex items-start space-x-3">
-                        <MapPin className="h-5 w-5 mt-0.5" style={{ color: 'var(--theme-accent)' }} />
-                        <div>
-                          <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Address</p>
-                          <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{outlet.address}</p>
+              {/* Right - Status and Location Button */}
+              <div className="flex items-center space-x-2">
+                {/* Connection Status */}
+                <div className="flex items-center space-x-1">
+                  {connectionStatus === 'online' ? (
+                    <div className="flex items-center space-x-1">
+                      <div className={`w-2 h-2 rounded-full ${isPolling ? 'bg-blue-500 animate-pulse' : 'bg-green-500'}`}></div>
+                      <span className="text-xs" style={{ color: 'var(--theme-text-secondary)' }}>
+                        {isPolling ? 'Updating...' : 'Live'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-1">
+                      <WifiOff className="h-3 w-3 text-red-500" />
+                      <span className="text-xs text-red-500">Offline</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Manual Refresh Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleManualRefresh}
+                  disabled={isLoading || isPolling}
+                  className="h-8 w-8 p-0"
+                >
+                  <RefreshCw className={`h-4 w-4 ${(isLoading || isPolling) ? 'animate-spin' : ''}`} />
+                </Button>
+
+                {/* Location Button */}
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center space-x-1" style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text)' }}>
+                      <MapPin className="h-4 w-4" />
+                      <span className="hidden sm:inline">Location</span>
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-80" style={{ backgroundColor: 'var(--theme-surface)', borderColor: 'var(--theme-border)' }}>
+                    <SheetHeader>
+                      <SheetTitle style={{ color: 'var(--theme-text)' }}>Location & Contact</SheetTitle>
+                      <SheetDescription style={{ color: 'var(--theme-text-secondary)' }}>
+                        Find us and get in touch
+                      </SheetDescription>
+                    </SheetHeader>
+                    <div className="mt-6 space-y-4">
+                      {outlet.address && (
+                        <div className="flex items-start space-x-3">
+                          <MapPin className="h-5 w-5 mt-0.5" style={{ color: 'var(--theme-accent)' }} />
+                          <div>
+                            <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Address</p>
+                            <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{outlet.address}</p>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {outlet.phone && (
-                      <div className="flex items-start space-x-3">
-                        <Phone className="h-5 w-5 mt-0.5" style={{ color: 'var(--theme-accent)' }} />
-                        <div>
-                          <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Phone</p>
-                          <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{outlet.phone}</p>
+                      )}
+                      {outlet.phone && (
+                        <div className="flex items-start space-x-3">
+                          <Phone className="h-5 w-5 mt-0.5" style={{ color: 'var(--theme-accent)' }} />
+                          <div>
+                            <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Phone</p>
+                            <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>{outlet.phone}</p>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    <div className="flex items-start space-x-3">
-                      <Clock className="h-5 w-5 mt-0.5" style={{ color: 'var(--theme-accent)' }} />
-                      <div>
-                        <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Hours</p>
-                        <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>Open • Closes 11:00 PM</p>
+                      )}
+                      <div className="flex items-start space-x-3">
+                        <Clock className="h-5 w-5 mt-0.5" style={{ color: 'var(--theme-accent)' }} />
+                        <div>
+                          <p className="font-medium" style={{ color: 'var(--theme-text)' }}>Hours</p>
+                          <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>Open • Closes 11:00 PM</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </SheetContent>
-              </Sheet>
+                  </SheetContent>
+                </Sheet>
+              </div>
             </div>
           </div>
         </div>
