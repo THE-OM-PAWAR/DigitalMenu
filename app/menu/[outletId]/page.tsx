@@ -78,6 +78,16 @@ export default function PublicMenuPage() {
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isComponentMountedRef = useRef(true);
 
+  // Get the base URL for API calls
+  const getBaseUrl = () => {
+    if (typeof window !== 'undefined') {
+      // Client-side: use current origin
+      return window.location.origin;
+    }
+    // Server-side fallback (shouldn't be used in this client component)
+    return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  };
+
   useEffect(() => {
     isComponentMountedRef.current = true;
     return () => {
@@ -181,21 +191,47 @@ export default function PublicMenuPage() {
         return;
       }
 
+      const baseUrl = getBaseUrl();
+      console.log('Fetching menu data from:', baseUrl);
+
+      // Create axios instance with proper configuration for Vercel
+      const apiClient = axios.create({
+        baseURL: baseUrl,
+        timeout: 15000, // 15 second timeout
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      });
+
       const requests = [
-        axios.get(`/api/public/outlets/${outletId}`),
-        axios.get(`/api/public/categories?outletId=${outletId}`),
-        axios.get(`/api/public/items?outletId=${outletId}`),
-        axios.get(`/api/public/items/highlighted?outletId=${outletId}`)
+        apiClient.get(`/api/public/outlets/${outletId}`),
+        apiClient.get(`/api/public/categories?outletId=${outletId}`),
+        apiClient.get(`/api/public/items?outletId=${outletId}`),
+        apiClient.get(`/api/public/items/highlighted?outletId=${outletId}`)
       ];
 
+      console.log('Making API requests...');
       const [outletResponse, categoriesResponse, itemsResponse, highlightedResponse] = await Promise.all(
         requests.map(request => 
           request.catch(err => {
-            console.error('API request failed:', err.response?.data || err.message);
+            console.error('API request failed:', {
+              url: err.config?.url,
+              status: err.response?.status,
+              message: err.message,
+              data: err.response?.data
+            });
             throw err;
           })
         )
       );
+
+      console.log('API responses received:', {
+        outlet: !!outletResponse.data.outlet,
+        categories: categoriesResponse.data.categories?.length || 0,
+        items: itemsResponse.data.items?.length || 0,
+        highlighted: highlightedResponse.data.items?.length || 0
+      });
 
       // Only update state if component is still mounted
       if (isComponentMountedRef.current) {
@@ -211,7 +247,17 @@ export default function PublicMenuPage() {
         }
       }
     } catch (error: any) {
-      console.error('Error fetching menu data:', error);
+      console.error('Error fetching menu data:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          baseURL: error.config?.baseURL
+        }
+      });
       
       if (isComponentMountedRef.current) {
         setConnectionStatus('offline');
@@ -220,10 +266,14 @@ export default function PublicMenuPage() {
           setError('Menu not found');
         } else if (error.response?.status === 400) {
           setError('Invalid outlet ID');
+        } else if (error.code === 'ECONNABORTED') {
+          setError('Request timeout - please check your connection');
+        } else if (error.code === 'ERR_NETWORK') {
+          setError('Network error - please check your internet connection');
         } else {
           // For polling requests, don't show error to user, just log it
           if (!isPollingRequest) {
-            setError('Failed to load menu. Please try again later.');
+            setError(`Failed to load menu: ${error.message || 'Unknown error'}`);
           }
         }
       }
@@ -239,6 +289,7 @@ export default function PublicMenuPage() {
   };
 
   const handleManualRefresh = () => {
+    console.log('Manual refresh triggered');
     fetchMenuData();
   };
 
@@ -310,6 +361,7 @@ export default function PublicMenuPage() {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-gray-200 border-t-gray-900 rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 text-lg">Loading menu...</p>
+          <p className="text-gray-400 text-sm mt-2">Connecting to {getBaseUrl()}</p>
         </div>
       </div>
     );
@@ -320,13 +372,26 @@ export default function PublicMenuPage() {
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center max-w-md mx-auto px-4">
           <Store className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Oops!</h1>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Connection Error</h1>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <div className="text-xs text-gray-400 mb-6 p-3 bg-gray-50 rounded">
+            <p>Base URL: {getBaseUrl()}</p>
+            <p>Outlet ID: {outletId}</p>
+            <p>Status: {connectionStatus}</p>
+          </div>
           <Button 
             onClick={handleManualRefresh}
             className="bg-gray-900 hover:bg-gray-800"
+            disabled={isLoading}
           >
-            Try Again
+            {isLoading ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Retrying...
+              </>
+            ) : (
+              'Try Again'
+            )}
           </Button>
         </div>
       </div>
