@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Order from '@/models/Order';
-import { getAuthUser } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 import { OrderStatus, PaymentStatus } from '@/lib/orderTypes';
 
 export async function GET(request: NextRequest) {
   try {
-    const user = getAuthUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Public endpoint: no authentication required for menu/guest access
+    // const user = getAuthUser(request);
+    // if (!user) {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // }
 
     await connectDB();
 
